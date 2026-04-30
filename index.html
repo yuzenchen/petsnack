@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<!--
+================================================================================
+  Wama' House 🐾 Pet Snack Shop  ── 寵物零食電商示範頁 (single-file demo)
+================================================================================
+  專案說明：
+    這是一個以「單檔 HTML + 內嵌 CSS + 內嵌 JS」為架構的前端 demo 網頁,
+    用來模擬寵物零食電商的:訪客瀏覽 / 經銷下單 / 後台管理 三種使用情境。
+    所有資料 (商品、組合包、加價購) 皆為 JS 變數,重新整理頁面後會回到預設值。
+
+  使用者角色 (透過 body class 區分顯示權限):
+    role-guest   一般訪客  : 可瀏覽公開商品與組合包、加入購物車、結帳。
+    role-dealer  經銷商    : 多了「經銷專區 / 經銷專屬 VIP 組合包 / 訂貨單」。
+    role-admin   管理員    : 多了「後台管理」(新增/上下架/刪除組合包與加價購)。
+
+  Demo 測試帳號 (寫死於 DEMO_ACCOUNTS):
+    經銷商  : dealer / pet2026
+    管理員  : admin  / admin2026
+
+  頁面結構 (SPA,以 .page.active 控制顯示):
+    #page-shop    首頁 (Hero、分類、品質承諾、組合包、單品)
+    #page-dealer  經銷專區 (VIP 組合包、訂貨單)
+    #page-cart    購物車 (含結帳前加價購區塊)
+    #page-admin   後台管理 (Dashboard、組合包 CRUD、加價購 CRUD、訂單列表)
+
+  RWD 斷點 (mobile-first):
+    768px  以上→ 雙欄分類、產品 3 欄
+    900px  以上→ 顯示桌面導覽列、隱藏底部 nav、購物車側邊欄
+    1024px 以上→ 產品 4 欄
+
+  字型:
+    標題  Playfair Display (英文襯線)
+    內文  Noto Sans TC      (繁體中文)
+
+  注意:
+    本檔案僅供示範,無串接後端 API、無實際金流,所有「結帳」皆為 toast 提示。
+================================================================================
+-->
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Wama' House 🐾 Pet Snack Shop</title>
+<!-- 預先連線 Google Fonts,加速字型下載 -->
+<!-- 字型載入:Noto Sans TC (繁體內文) + Playfair Display (英文標題) -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&family=Playfair+Display:wght@700&display=swap" rel="stylesheet">
+<!-- ============================================================
+     CSS 區塊概覽 (依出現順序)
+     ============================================================
+     1. RESET / VAR    : 全域 reset、CSS 變數 (色票 / 圓角 / 陰影)
+     2. SKIP LINK      : 跳至主內容,a11y 必要
+     3. ANNOUNCEMENT   : 頂部公告列
+     4. HEADER         : sticky 導覽列 + Logo + 角色徽章 + 購物車
+     5. PAGE / HERO    : 分頁切換動畫、首頁主視覺
+     6. CATEGORY       : 狗/貓分類介紹卡
+     7. PROMISE BAND   : 四大品質承諾
+     8. PRODUCT GRID   : 單品 / 組合包卡片網格 + 篩選 chip
+     9. DEALER PAGE    : 經銷 banner、訂貨單表單
+    10. FORM CONTROLS  : 共用 input / select / textarea 樣式
+    11. CART PAGE      : 購物車品項卡 + 側邊結帳摘要
+    12. ADDON SECTION  : 結帳前加價購區 (橘色虛線框)
+    13. ADMIN PAGE     : 後台統計卡、表單、組合包列表、訂單表
+    14. FOOTER         : 四欄式頁尾
+    15. BOTTOM NAV     : 行動裝置底部導覽 (≤900px 顯示)
+    16. TOAST / MODAL  : 通用 toast 提示與登入視窗
+     ============================================================ -->
+<link rel="stylesheet" href="style.css">
+</head>
+<body class="role-guest">
+
+<a href="#main-content" class="skip-link">跳至主要內容</a>
+
+<!-- 公告列 -->
+<div class="announcement-bar">
+  ✨ 歡迎光臨Wama' House｜<strong>初次見面領 50 元購物金</strong>｜全館滿 NT$500 免運 🚚
+</div>
+
+<!-- 頂部導覽 -->
+<header role="banner">
+  <div class="header-container">
+    <a href="#" class="logo" onclick="switchPage('shop');return false;">
+      <span class="logo-emoji" aria-hidden="true">🐾</span>
+      Wama' House
+      <small>PET SNACK SHOP</small>
+    </a>
+    <nav class="nav-links" role="tablist" aria-label="主導覽">
+      <button id="nav-link-shop" role="tab" aria-selected="true" class="active" onclick="switchPage('shop')">首頁</button>
+      <button onclick="filterAndScroll('dog')">狗狗推薦</button>
+      <button onclick="filterAndScroll('cat')">貓咪推薦</button>
+      <button onclick="bundleScroll()">超值組合</button>
+      <button id="nav-link-dealer" class="dealer-only" role="tab" aria-selected="false" onclick="switchPage('dealer')">經銷專區</button>
+      <button id="nav-link-admin" class="admin-only" role="tab" aria-selected="false" onclick="switchPage('admin')">後台管理</button>
+    </nav>
+    <div class="header-icons">
+      <button class="role-pill" id="role-pill" onclick="openLoginModal()" aria-label="登入帳號">
+        <span id="role-icon" aria-hidden="true">👤</span>
+        <span id="role-text">登入 / 註冊</span>
+      </button>
+      <button class="cart-link" onclick="switchPage('cart')" aria-label="前往購物車">
+        🛒 購物車 <span class="cart-count" id="nav-cart-count">0</span>
+      </button>
+    </div>
+  </div>
+</header>
+
+<main id="main-content">
+
+<!-- ============================
+     SHOP PAGE
+     ============================ -->
+<div id="page-shop" class="page active">
+
+  <!-- HERO -->
+  <section class="hero-banner" aria-label="主視覺">
+    <img class="hero-banner-bg" src="assets/banner.jpg" alt="" aria-hidden="true">
+    <h2>用最純粹的食材，照顧最愛的毛家人</h2>
+    <p>100% 天然純肉烘焙｜無添加防腐劑｜台灣在地嚴選</p>
+    <button class="btn-primary" onclick="bundleScroll()">立即選購 →</button>
+  </section>
+
+  <!-- 分類介紹 -->
+  <div class="section-title">
+    <h3>Featured Categories<span class="zh">精選零食系列</span></h3>
+    <p>為不同需求的毛孩，打造專屬的美味時光</p>
+  </div>
+
+  <section class="category-showcase">
+    <div class="category-card" onclick="filterAndScroll('dog')" role="button" tabindex="0">
+      <span class="cat-emoji" aria-hidden="true">🐶</span>
+      <h4>Dog Treats<span class="zh">狗狗鮮肉零食</span></h4>
+      <p>精選低脂肉品，適合日常訓練。使用當日屠宰新鮮肉品，讓食材本身的鮮味，訴說產品的用心，小巧好入口，獎勵沒負擔。</p>
+      <a class="btn-outline" onclick="event.stopPropagation();filterAndScroll('dog')">更多狗狗零食</a>
+    </div>
+    <div class="category-card" onclick="filterAndScroll('cat')" role="button" tabindex="0">
+      <span class="cat-emoji" aria-hidden="true">🐱</span>
+      <h4>Cat Treats<span class="zh">貓咪海鮮零食</span></h4>
+      <p>挑選硬度適中食材，人工精細修除油膜，讓正在飲食控制中的貓咪也能享受開心啃咬的樂趣，清潔牙齒兼顧紓壓。</p>
+      <a class="btn-outline" onclick="event.stopPropagation();filterAndScroll('cat')">更多貓咪零食</a>
+    </div>
+  </section>
+
+  <!-- 品質承諾 -->
+  <section class="promise-band" aria-label="我們的承諾">
+    <div class="promise-item"><span class="pi-icon" aria-hidden="true">🌿</span><h6>100% 天然食材</h6><small>嚴選台灣產地<br>無添加防腐劑</small></div>
+    <div class="promise-item"><span class="pi-icon" aria-hidden="true">🏭</span><h6>SGS 檢驗合格</h6><small>每批次嚴格把關<br>毛孩吃得安心</small></div>
+    <div class="promise-item"><span class="pi-icon" aria-hidden="true">🚚</span><h6>滿 500 免運</h6><small>全台 24h 到貨<br>低溫宅配保鮮</small></div>
+    <div class="promise-item"><span class="pi-icon" aria-hidden="true">💝</span><h6>會員回饋</h6><small>首購送 50 購物金<br>消費再回饋</small></div>
+  </section>
+
+  <!-- 組合包 -->
+  <div class="section-title" id="bundle-anchor">
+    <h3>Bundle Sets<span class="zh">超值組合包</span></h3>
+    <p>主廚精選搭配，最高省 40%，毛孩超滿足</p>
+  </div>
+  <section class="product-grid" id="bundle-grid-shop"></section>
+
+  <!-- 單品 -->
+  <div class="section-title">
+    <h3>All Products<span class="zh">主廚推推・新品上市</span></h3>
+    <p>最新鮮的美味，限量供應中</p>
+  </div>
+  <div class="filter-row" role="group" aria-label="商品分類篩選">
+    <button class="filter-btn active" aria-pressed="true" onclick="filterProds('all',this)">全部商品</button>
+    <button class="filter-btn" aria-pressed="false" onclick="filterProds('dog',this)">🐶 狗狗</button>
+    <button class="filter-btn" aria-pressed="false" onclick="filterProds('cat',this)">🐱 貓咪</button>
+    <button class="filter-btn" aria-pressed="false" onclick="filterProds('both',this)">🌟 通用</button>
+  </div>
+  <section class="product-grid" id="products-grid"></section>
+  <div class="view-all-wrap"><button class="btn-outline" onclick="bundleScroll()">瀏覽全部商品 →</button></div>
+</div>
+
+<!-- ============================
+     DEALER PAGE
+     ============================ -->
+<div id="page-dealer" class="page">
+  <div class="dealer-banner" id="dealer-banner-info">
+    <div class="db-info">
+      <span class="db-icon" aria-hidden="true">💼</span>
+      <div class="db-text">經銷商專屬區<small id="dealer-welcome">歡迎登入</small></div>
+    </div>
+    <button class="db-logout" onclick="logout()">登出</button>
+  </div>
+
+  <div class="section-title">
+    <h3>VIP Bundle Sets<span class="zh">經銷專屬組合包</span><span class="vip-tag">VIP</span></h3>
+    <p>批量採購、量販包裝、最大優惠</p>
+  </div>
+  <section class="product-grid" id="bundle-grid-dealer"></section>
+
+  <div class="section-title"><h3>Wholesale Order<span class="zh">經銷訂貨單</span></h3><p>填寫批量訂貨資訊，我們將優先處理</p></div>
+  <div class="dealer-order-card">
+    <h3>批量訂貨資訊</h3>
+    <p class="doc-sub">選擇商品加入購物車後，請填寫以下訂貨資訊 ✨</p>
+    <div class="do-fields">
+      <div><label for="do-shop">店家名稱</label><input type="text" id="do-shop" placeholder="毛孩之家寵物店"></div>
+      <div><label for="do-contact">聯絡人</label><input type="text" id="do-contact" placeholder="王店長"></div>
+      <div><label for="do-phone">聯絡電話</label><input type="tel" id="do-phone" placeholder="0912-345-678" autocomplete="tel"></div>
+      <div><label for="do-date">預計交貨日</label><input type="text" id="do-date" placeholder="2026/05/15"></div>
+      <div class="full"><label for="do-note">備註 / 特殊需求</label><textarea id="do-note" placeholder="例：需要分批配送、需要發票抬頭..."></textarea></div>
+    </div>
+  </div>
+</div>
+
+<!-- ============================
+     CART PAGE
+     ============================ -->
+<div id="page-cart" class="page">
+  <div class="cart-header">
+    <h2>🛒 我的購物車</h2>
+    <button class="clear-btn" onclick="clearCart()">清空購物車</button>
+  </div>
+  <div id="cart-content"></div>
+</div>
+
+<!-- ============================
+     ADMIN PAGE
+     ============================ -->
+<div id="page-admin" class="page">
+  <div class="section-title"><h3>Dashboard<span class="zh">營運總覽</span></h3></div>
+  <div class="admin-stats">
+    <div class="stat-card"><div class="stat-emoji">📦</div><div class="stat-value" id="stat-prod">8</div><div class="stat-label">上架商品</div></div>
+    <div class="stat-card"><div class="stat-emoji">🎁</div><div class="stat-value" id="stat-bundle">0</div><div class="stat-label">公開組合</div></div>
+    <div class="stat-card"><div class="stat-emoji">💼</div><div class="stat-value" id="stat-dealer">0</div><div class="stat-label">經銷組合</div></div>
+    <div class="stat-card"><div class="stat-emoji">🎀</div><div class="stat-value" id="stat-addon">0</div><div class="stat-label">加價購</div></div>
+    <div class="stat-card"><div class="stat-emoji">💰</div><div class="stat-value">38,420</div><div class="stat-label">本月營收</div></div>
+  </div>
+
+  <!-- 新增組合包 -->
+  <div class="admin-card">
+    <div class="admin-card-hd"><h3>➕ 新增組合包</h3><span class="admin-hint">選 2–4 件單品 + 設定折扣 + 權限</span></div>
+    <div class="form-grid">
+      <div><label for="b-name">組合包名稱</label><input type="text" id="b-name" placeholder="例：狗狗健康三寶組"></div>
+      <div><label for="b-tag">分類標籤</label>
+        <select id="b-tag">
+          <option>🐶 狗狗專屬</option><option>🐱 貓咪專屬</option><option>🌟 毛孩通用</option>
+        </select>
+      </div>
+    </div>
+    <div class="visibility-toggle">
+      <div class="vis-opt active" data-vis="public" onclick="setVisibility(this,'public')">
+        <span class="vis-opt-icon" aria-hidden="true">🌐</span><div class="vis-opt-label">公開</div><div class="vis-opt-sub">所有訪客可見</div>
+      </div>
+      <div class="vis-opt" data-vis="dealer" onclick="setVisibility(this,'dealer')">
+        <span class="vis-opt-icon" aria-hidden="true">💼</span><div class="vis-opt-label">經銷限定</div><div class="vis-opt-sub">登入後可見</div>
+      </div>
+    </div>
+    <div class="selector-area">
+      <div class="selector-label">選擇組合商品（2–4 件）</div>
+      <div class="prod-selector" id="prod-selector"></div>
+    </div>
+    <div class="discount-area">
+      <div class="selector-label">組合折扣</div>
+      <div class="discount-row">
+        <span class="disc-label">5%</span>
+        <input type="range" id="disc-slider" min="5" max="50" step="1" value="15" oninput="updatePreview()" aria-label="折扣百分比">
+        <span class="disc-label">50%</span>
+        <span class="disc-val" id="disc-val">15% OFF</span>
+      </div>
+    </div>
+    <div class="preview-box" id="preview-box"><span class="preview-hint">請選擇商品後預覽定價</span></div>
+    <div class="form-actions">
+      <button class="pill-btn gray" onclick="resetBundleForm()">清除重填</button>
+      <button class="pill-btn green" onclick="saveBundle()">儲存並上架 ✓</button>
+    </div>
+  </div>
+
+  <!-- 現有組合包 -->
+  <div class="admin-card">
+    <div class="admin-card-hd"><h3>📋 現有組合包</h3></div>
+    <div id="bundle-admin-list"></div>
+  </div>
+
+  <!-- 加價購管理 -->
+  <div class="admin-card">
+    <div class="admin-card-hd"><h3>🎁 加價購管理</h3><span class="admin-hint">結帳前限定，最多 8 件</span></div>
+    <div class="form-grid">
+      <div><label for="ad-name">商品名稱</label><input type="text" id="ad-name" placeholder="例：雞肉小肉乾片"></div>
+      <div><label for="ad-emoji">商品 Emoji</label><input type="text" id="ad-emoji" placeholder="🍗" maxlength="4"></div>
+      <div><label for="ad-orig">原價（NT$）</label><input type="number" id="ad-orig" placeholder="120" min="1"></div>
+      <div><label for="ad-special">加購價（NT$）</label><input type="number" id="ad-special" placeholder="49" min="1"></div>
+    </div>
+    <div class="form-actions">
+      <button class="pill-btn gray" onclick="resetAddonForm()">清除重填</button>
+      <button class="pill-btn green" onclick="saveAddon()">新增加價購商品 ✓</button>
+    </div>
+    <div id="addon-admin-list"></div>
+  </div>
+
+  <!-- 訂單 -->
+  <div class="admin-card">
+    <div class="admin-card-hd"><h3>🧾 最新訂單</h3></div>
+    <div class="table-wrap">
+      <table class="order-table">
+        <thead><tr><th>訂單編號</th><th>類型</th><th>商品</th><th>金額</th><th>狀態</th></tr></thead>
+        <tbody>
+          <tr><td>#D20240420</td><td><span class="order-status s-dealer">經銷</span></td><td>毛孩之家寵物店 x1</td><td>NT$12,800</td><td><span class="order-status s-paid">已付款</span></td></tr>
+          <tr><td>#20240420</td><td><span class="order-status s-pend">一般</span></td><td>雞肉肉乾 x2</td><td>NT$480</td><td><span class="order-status s-paid">已付款</span></td></tr>
+          <tr><td>#D20240419</td><td><span class="order-status s-dealer">經銷</span></td><td>愛寵嚴選 x1</td><td>NT$8,520</td><td><span class="order-status s-ship">運送中</span></td></tr>
+          <tr><td>#20240419</td><td><span class="order-status s-pend">一般</span></td><td>狗狗三寶組 x1</td><td>NT$548</td><td><span class="order-status s-ship">運送中</span></td></tr>
+          <tr><td>#20240418</td><td><span class="order-status s-pend">一般</span></td><td>鮪魚凍乾 x3</td><td>NT$780</td><td><span class="order-status s-pend">待確認</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+</main>
+
+<!-- ============================
+     FOOTER
+     ============================ -->
+<footer role="contentinfo">
+  <div class="footer-container">
+    <div class="footer-col">
+      <h5>關於我們</h5>
+      <ul><li>品牌故事</li><li>食材來源</li><li>檢驗報告</li><li>合作店家</li></ul>
+    </div>
+    <div class="footer-col">
+      <h5>顧客服務</h5>
+      <ul><li>常見問題</li><li>退換貨政策</li><li>會員權益</li><li>配送與運費</li></ul>
+    </div>
+    <div class="footer-col">
+      <h5>聯絡我們</h5>
+      <ul><li>📞 0800-123-456</li><li>✉️ hello@petsnack.tw</li><li>🕘 週一至週五 10:00–18:00</li><li>LINE 線上客服</li></ul>
+    </div>
+    <div class="footer-col">
+      <h5>Follow Us</h5>
+      <p>跟著我們認識更多毛孩相關資訊 ♡</p>
+      <ul><li>📷 Instagram</li><li>📘 Facebook</li><li>💬 Line@</li></ul>
+      <h5 style="margin-top:14px;font-size:13px">付款方式</h5>
+      <div class="footer-pay"><span>VISA</span><span>MASTER</span><span>JCB</span><span>LINE PAY</span><span>超商</span></div>
+    </div>
+  </div>
+  <div class="footer-bottom">
+    <p>Wama' House © 2026 Pet Snack Shop. All rights reserved. | 此為示範網頁，無商業用途</p>
+  </div>
+</footer>
+
+<!-- 手機底部導覽 -->
+<nav class="bottom-nav" aria-label="底部導覽">
+  <button class="bnav-btn active" id="bnav-shop" onclick="switchPage('shop')"><span class="bnav-icon" aria-hidden="true">🏪</span>商店</button>
+  <button class="bnav-btn dealer-only" id="bnav-dealer" onclick="switchPage('dealer')"><span class="bnav-icon" aria-hidden="true">💼</span>經銷</button>
+  <button class="bnav-btn" id="bnav-cart" onclick="switchPage('cart')"><span class="bnav-icon" aria-hidden="true">🛒</span>購物車<span class="bnav-badge" id="bnav-badge" style="display:none">0</span></button>
+  <button class="bnav-btn admin-only" id="bnav-admin" onclick="switchPage('admin')"><span class="bnav-icon" aria-hidden="true">⚙️</span>後台</button>
+</nav>
+
+<!-- LOGIN MODAL -->
+<div class="modal-overlay" id="login-modal" role="dialog" aria-modal="true" aria-labelledby="login-modal-title" aria-hidden="true">
+  <div class="modal">
+    <button class="modal-close" onclick="closeLoginModal()" aria-label="關閉登入視窗">×</button>
+    <div class="modal-icon" aria-hidden="true">🔐</div>
+    <h3 id="login-modal-title">登入帳號</h3>
+    <p class="modal-sub">經銷商與管理員專屬</p>
+    <div class="modal-field">
+      <label for="login-user">帳號</label>
+      <input type="text" id="login-user" placeholder="請輸入帳號" autocomplete="username" aria-required="true">
+    </div>
+    <div class="modal-field">
+      <label for="login-pass">密碼</label>
+      <input type="password" id="login-pass" placeholder="請輸入密碼" autocomplete="current-password" aria-required="true" onkeypress="if(event.key==='Enter')doLogin()">
+    </div>
+    <div id="login-error" role="alert" aria-live="assertive" style="min-height:20px;color:var(--red);font-size:12px;font-weight:700;margin-bottom:8px"></div>
+    <div class="modal-actions">
+      <button class="modal-btn primary" onclick="doLogin()">登入</button>
+      <button class="modal-btn outline" onclick="closeLoginModal()">取消</button>
+    </div>
+    <div class="demo-creds">
+      <b>📝 Demo 測試帳號：</b><br>
+      經銷商：<code>dealer</code> / <code>pet2026</code><br>
+      管理員：<code>admin</code> / <code>admin2026</code>
+    </div>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div class="toast" id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
+
+<script src="app.js" defer></script>
+</body>
+</html>

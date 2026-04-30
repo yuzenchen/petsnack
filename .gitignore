@@ -28,11 +28,11 @@ Git-*.exe
 
 # 舊版本檔（避免誤上傳）
 wama_house_index_*.html
+wama_house_v2.html
 gemini-code-*.html
-index_*.html
+index_2*.html
 demo*.html
 prototype*.html
-index.html
 
-# 資源資料夾（暫不上傳，要的話刪掉這行）
+# 大資料夾（暫不上傳）
 png/
