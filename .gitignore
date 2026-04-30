@@ -36,3 +36,6 @@ prototype*.html
 
 # 大資料夾（暫不上傳）
 png/
+
+# 後端是另一個 repo (petsnack-backend),不要被前端 repo 追蹤
+wama-house-backend/
