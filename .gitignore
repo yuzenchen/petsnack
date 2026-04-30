@@ -1,0 +1,38 @@
+# 系統 / 編輯器
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/
+.claude/
+*.swp
+*~
+
+# Node / 套件管理（如果之後加入工具鏈）
+node_modules/
+package-lock.json
+yarn.lock
+
+# 暫存檔
+*.tmp
+*.bak
+*.log
+_banner_data.txt
+
+# 安裝檔 / 工具
+Git/
+Git-*.exe
+*.exe
+*.msi
+*.zip
+
+# 舊版本檔（避免誤上傳）
+wama_house_index_*.html
+gemini-code-*.html
+index_*.html
+demo*.html
+prototype*.html
+index.html
+
+# 資源資料夾（暫不上傳，要的話刪掉這行）
+png/
