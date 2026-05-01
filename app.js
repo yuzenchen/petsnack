@@ -53,6 +53,22 @@ function closeLoginModal() {
   }
 }
 
+/* Modal backdrop click → close（點到 overlay 本體而非內容） */
+const _MODAL_CLOSERS = {
+  'product-modal': () => closeProductModal(),
+  'order-confirm-modal': () => closeOrderConfirmModal(),
+  'order-modal': () => closeOrderModal(),
+  'checkout-modal': () => closeCheckoutModal(),
+  'login-modal': () => closeLoginModal(),
+};
+document.addEventListener('click', function (e) {
+  const overlay = e.target;
+  if (!overlay.classList || !overlay.classList.contains('modal-overlay')) return;
+  if (!overlay.classList.contains('active')) return;
+  const closer = _MODAL_CLOSERS[overlay.id];
+  if (closer) closer();
+});
+
 document.addEventListener('keydown', function (e) {
   // 商品詳情 modal: Escape 關閉
   const prodM = document.getElementById('product-modal');
@@ -221,12 +237,32 @@ function stockBadgeHtml(stockOrItem, lowThreshold = 5, trackStock = true) {
   return '<span class="stock-badge ok">有現貨</span>';
 }
 
+/* HTML / 屬性內 JS 字串跳脫 helper */
+function escHtml(s) {
+  return String(s ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+function escAttrJs(s) {
+  return String(s ?? '')
+    .replace(/\\/g, '\\\\')
+    .replace(/'/g, "\\'")
+    .replace(/\r?\n/g, '\\n')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
 /* 商品圖片 / emoji 顯示（有 imageUrl 時顯示 img，否則顯示 emoji） */
 function productMediaHtml(item) {
   if (item.imageUrl) {
-    return `<div class="product-img" data-emoji="${item.emoji || ''}" aria-hidden="true"><img src="${item.imageUrl}" alt="${item.name}" class="prod-real-img" onerror="this.parentNode.innerHTML=this.parentNode.dataset.emoji"></div>`;
+    return `<div class="product-img" data-emoji="${escHtml(item.emoji || '')}" aria-hidden="true"><img src="${escHtml(item.imageUrl)}" alt="${escHtml(item.name)}" class="prod-real-img" onerror="this.parentNode.innerHTML=this.parentNode.dataset.emoji"></div>`;
   }
-  return `<div class="product-img" aria-hidden="true">${item.emoji || ''}</div>`;
+  return `<div class="product-img" aria-hidden="true">${escHtml(item.emoji || '')}</div>`;
 }
 
 async function reloadCatalog() {
@@ -299,15 +335,15 @@ function renderProducts() {
       ${p.badge ? `<span class="product-badge ${p.badge}">${lbl[p.badge]}</span>` : ''}
       ${productMediaHtml(p)}
       <div class="product-info">
-        <h5>${p.name}</h5>
-        <div class="product-sub">${p.sub || ''}</div>
+        <h5>${escHtml(p.name)}</h5>
+        <div class="product-sub">${escHtml(p.sub || '')}</div>
         <div class="price-wrap">
           <span class="price-sale">NT$ ${p.price}</span>
           ${p.orig ? `<span class="price-regular">NT$ ${p.orig}</span>` : ''}
         </div>
         ${badge}
       </div>
-      <button class="add-cart-btn" ${isOut ? 'disabled aria-disabled="true"' : ''} onclick="event.stopPropagation();addToCart('prod_${p.id}','${p.emoji} ${p.name}','單品',${p.price},this)">${isOut ? '缺貨中' : '加入購物車'}</button>
+      <button class="add-cart-btn" ${isOut ? 'disabled aria-disabled="true"' : ''} onclick="event.stopPropagation();addToCart('prod_${p.id}','${escAttrJs(p.emoji + ' ' + p.name)}','單品',${p.price},this)">${isOut ? '缺貨中' : '加入購物車'}</button>
     </article>`;
   }).join('');
 }
@@ -352,25 +388,25 @@ function openProductModal(itemType, id) {
     const isOut = tracked && (p.stock ?? 0) <= 0;
     const badge = stockBadgeHtml(p.stock, p.lowStockThreshold ?? 5, p.trackStock);
     const imgContent = p.imageUrl
-      ? `<div class="pmd-img-wrap" data-emoji="${p.emoji}" aria-hidden="true"><img src="${p.imageUrl}" alt="${p.name}" class="prod-real-img" onerror="this.parentNode.innerHTML=this.parentNode.dataset.emoji"></div>`
-      : `<div class="pmd-img-wrap" aria-hidden="true"><div class="product-modal-emoji">${p.emoji}</div></div>`;
+      ? `<div class="pmd-img-wrap" data-emoji="${escHtml(p.emoji)}" aria-hidden="true"><img src="${escHtml(p.imageUrl)}" alt="${escHtml(p.name)}" class="prod-real-img" onerror="this.parentNode.innerHTML=this.parentNode.dataset.emoji"></div>`
+      : `<div class="pmd-img-wrap" aria-hidden="true"><div class="product-modal-emoji">${escHtml(p.emoji)}</div></div>`;
     html = `
       <div class="pmd-layout">
         ${imgContent}
         <div class="pmd-info">
-          <h3 id="product-modal-title">${p.name}</h3>
-          ${p.sub ? `<p class="pmd-sub">${p.sub}</p>` : ''}
+          <h3 id="product-modal-title">${escHtml(p.name)}</h3>
+          ${p.sub ? `<p class="pmd-sub">${escHtml(p.sub)}</p>` : ''}
           <div class="pmd-price-wrap">
             <span class="price-sale">NT$ ${p.price}</span>
             ${p.orig ? `<span class="price-regular">NT$ ${p.orig}</span>` : ''}
           </div>
-          ${p.description ? `<p class="pmd-desc">${p.description}</p>` : ''}
+          ${p.description ? `<p class="pmd-desc">${escHtml(p.description)}</p>` : ''}
           <div class="pmd-tags">
-            ${p.type ? `<span class="pmd-tag">${PET_LABEL[p.type] || p.type}</span>` : ''}
-            ${p.badge ? `<span class="pmd-tag ${p.badge}">${BADGE_LABEL[p.badge] || p.badge}</span>` : ''}
+            ${p.type ? `<span class="pmd-tag">${escHtml(PET_LABEL[p.type] || p.type)}</span>` : ''}
+            ${p.badge ? `<span class="pmd-tag ${p.badge}">${escHtml(BADGE_LABEL[p.badge] || p.badge)}</span>` : ''}
           </div>
           ${badge}
-          <button class="modal-btn primary pmd-cart-btn" ${isOut ? 'disabled' : ''} onclick="addToCart('prod_${p.id}','${p.emoji} ${p.name}','單品',${p.price},this);closeProductModal()">
+          <button class="modal-btn primary pmd-cart-btn" ${isOut ? 'disabled' : ''} onclick="addToCart('prod_${p.id}','${escAttrJs(p.emoji + ' ' + p.name)}','單品',${p.price},this);closeProductModal()">
             ${isOut ? '⚠ 缺貨中' : '🛒 加入購物車'}
           </button>
         </div>
@@ -388,32 +424,32 @@ function openProductModal(itemType, id) {
     const isOut = avail <= 0;
     const badge = stockBadgeHtml(avail, 5);
     const imgContent = b.imageUrl
-      ? `<div class="pmd-img-wrap" data-emoji="${emojis}" aria-hidden="true"><img src="${b.imageUrl}" alt="${b.name}" class="prod-real-img" onerror="this.parentNode.innerHTML=this.parentNode.dataset.emoji"></div>`
-      : `<div class="pmd-img-wrap" aria-hidden="true"><div class="product-modal-emoji bundle-modal-emoji">${emojis}</div></div>`;
+      ? `<div class="pmd-img-wrap" data-emoji="${escHtml(emojis)}" aria-hidden="true"><img src="${escHtml(b.imageUrl)}" alt="${escHtml(b.name)}" class="prod-real-img" onerror="this.parentNode.innerHTML=this.parentNode.dataset.emoji"></div>`
+      : `<div class="pmd-img-wrap" aria-hidden="true"><div class="product-modal-emoji bundle-modal-emoji">${escHtml(emojis)}</div></div>`;
     html = `
       <div class="pmd-layout">
         ${imgContent}
         <div class="pmd-info">
-          <h3 id="product-modal-title">${b.name}</h3>
-          ${b.tag ? `<p class="pmd-sub">${b.tag}</p>` : ''}
+          <h3 id="product-modal-title">${escHtml(b.name)}</h3>
+          ${b.tag ? `<p class="pmd-sub">${escHtml(b.tag)}</p>` : ''}
           <div class="pmd-price-wrap">
             <span class="bundle-ribbon-inline">${b.disc}% OFF</span>
             <span class="price-sale">NT$ ${final}</span>
             <span class="price-regular">NT$ ${orig}</span>
           </div>
-          ${b.description ? `<p class="pmd-desc">${b.description}</p>` : ''}
+          ${b.description ? `<p class="pmd-desc">${escHtml(b.description)}</p>` : ''}
           <div class="pmd-bundle-items">
             <div class="pmd-items-label">包含商品</div>
             ${items.map(p => `
               <div class="pmd-bundle-item">
-                <span class="pmd-item-emoji">${p.emoji}</span>
-                <span class="pmd-item-name">${p.name}</span>
+                <span class="pmd-item-emoji">${escHtml(p.emoji)}</span>
+                <span class="pmd-item-name">${escHtml(p.name)}</span>
                 <span class="pmd-item-price">NT$${p.price}</span>
               </div>`).join('')}
           </div>
           <span class="bundle-save">組合立省 NT$${save}</span>
           ${badge}
-          <button class="modal-btn primary pmd-cart-btn" ${isOut ? 'disabled' : ''} onclick="addToCart('${key}','${emojis} ${b.name}','${bType}',${final},this);closeProductModal()">
+          <button class="modal-btn primary pmd-cart-btn" ${isOut ? 'disabled' : ''} onclick="addToCart('${escAttrJs(key)}','${escAttrJs(emojis + ' ' + b.name)}','${escAttrJs(bType)}',${final},this);closeProductModal()">
             ${isOut ? '⚠ 缺貨中' : '🛒 加入購物車'}
           </button>
         </div>
@@ -448,17 +484,17 @@ function renderBundleCard(b, isDealer) {
   const isOut = avail <= 0;
   const badge = stockBadgeHtml(avail, 5);
   const bundleImgHtml = b.imageUrl
-    ? `<div class="product-img" data-emoji="${emojis}" aria-hidden="true"><img src="${b.imageUrl}" alt="${b.name}" class="prod-real-img" onerror="this.parentNode.innerHTML=this.parentNode.dataset.emoji"></div>`
-    : `<div class="product-img" aria-hidden="true"><span class="bundle-emojis-row">${emojis}</span></div>`;
+    ? `<div class="product-img" data-emoji="${escHtml(emojis)}" aria-hidden="true"><img src="${escHtml(b.imageUrl)}" alt="${escHtml(b.name)}" class="prod-real-img" onerror="this.parentNode.innerHTML=this.parentNode.dataset.emoji"></div>`
+    : `<div class="product-img" aria-hidden="true"><span class="bundle-emojis-row">${escHtml(emojis)}</span></div>`;
   return `
     <article class="product-card bundle-card ${isDealer ? 'dealer' : ''}${isOut ? ' is-out' : ''}" onclick="openProductModal('bundle',${b.id})" style="cursor:pointer" tabindex="0" onkeydown="if(event.key==='Enter')openProductModal('bundle',${b.id})">
       ${isDealer ? '<span class="bundle-vip-tag">VIP</span>' : ''}
       <span class="bundle-ribbon">${b.disc}% OFF</span>
       ${bundleImgHtml}
       <div class="product-info">
-        <h5>${b.name}</h5>
-        <div class="product-sub">${b.tag || ''}</div>
-        <div class="bundle-items-list">${names}</div>
+        <h5>${escHtml(b.name)}</h5>
+        <div class="product-sub">${escHtml(b.tag || '')}</div>
+        <div class="bundle-items-list">${escHtml(names)}</div>
         <div class="price-wrap">
           <span class="price-sale">NT$ ${final}</span>
           <span class="price-regular">NT$ ${orig}</span>
@@ -466,7 +502,7 @@ function renderBundleCard(b, isDealer) {
         <span class="bundle-save">省 NT$${save}</span>
         ${badge}
       </div>
-      <button class="add-cart-btn" ${isOut ? 'disabled aria-disabled="true"' : ''} onclick="event.stopPropagation();addToCart('${key}','${emojis} ${b.name}','${type}',${final},this)">${isOut ? '缺貨中' : '加入購物車'}</button>
+      <button class="add-cart-btn" ${isOut ? 'disabled aria-disabled="true"' : ''} onclick="event.stopPropagation();addToCart('${escAttrJs(key)}','${escAttrJs(emojis + ' ' + b.name)}','${escAttrJs(type)}',${final},this)">${isOut ? '缺貨中' : '加入購物車'}</button>
     </article>`;
 }
 
