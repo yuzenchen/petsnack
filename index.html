@@ -127,13 +127,17 @@
   </div>
 
   <section class="category-showcase">
-    <div class="category-card" onclick="filterAndScroll('dog')" role="button" tabindex="0">
+    <div class="category-card" onclick="filterAndScroll('dog')"
+         onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();filterAndScroll('dog')}"
+         role="button" tabindex="0">
       <span class="cat-emoji" aria-hidden="true">🐶</span>
       <h4>Dog Treats<span class="zh">狗狗鮮肉零食</span></h4>
       <p>精選低脂肉品，適合日常訓練。使用當日屠宰新鮮肉品，讓食材本身的鮮味，訴說產品的用心，小巧好入口，獎勵沒負擔。</p>
       <a class="btn-outline" onclick="event.stopPropagation();filterAndScroll('dog')">更多狗狗零食</a>
     </div>
-    <div class="category-card" onclick="filterAndScroll('cat')" role="button" tabindex="0">
+    <div class="category-card" onclick="filterAndScroll('cat')"
+         onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();filterAndScroll('cat')}"
+         role="button" tabindex="0">
       <span class="cat-emoji" aria-hidden="true">🐱</span>
       <h4>Cat Treats<span class="zh">貓咪海鮮零食</span></h4>
       <p>挑選硬度適中食材，人工精細修除油膜，讓正在飲食控制中的貓咪也能享受開心啃咬的樂趣，清潔牙齒兼顧紓壓。</p>
@@ -239,10 +243,16 @@
       </div>
     </div>
     <div class="visibility-toggle">
-      <div class="vis-opt active" data-vis="public" onclick="setVisibility(this,'public')">
+      <div class="vis-opt active" data-vis="public"
+           onclick="setVisibility(this,'public')"
+           onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();setVisibility(this,'public')}"
+           role="radio" tabindex="0" aria-checked="true">
         <span class="vis-opt-icon" aria-hidden="true">🌐</span><div class="vis-opt-label">公開</div><div class="vis-opt-sub">所有訪客可見</div>
       </div>
-      <div class="vis-opt" data-vis="dealer" onclick="setVisibility(this,'dealer')">
+      <div class="vis-opt" data-vis="dealer"
+           onclick="setVisibility(this,'dealer')"
+           onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();setVisibility(this,'dealer')}"
+           role="radio" tabindex="0" aria-checked="false">
         <span class="vis-opt-icon" aria-hidden="true">💼</span><div class="vis-opt-label">經銷限定</div><div class="vis-opt-sub">登入後可見</div>
       </div>
     </div>
@@ -376,6 +386,24 @@
 
 <!-- TOAST -->
 <div class="toast" id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
+
+<!-- LOADING OVERLAY -->
+<div class="loading-overlay" id="loading-overlay" role="status" aria-live="polite" aria-label="載入中">
+  <div class="loading-spinner"></div>
+  <div class="loading-text">載入中…</div>
+</div>
+
+<!-- CONFIRM MODAL -->
+<div class="confirm-overlay" id="confirm-overlay" role="alertdialog" aria-modal="true" aria-labelledby="confirm-msg">
+  <div class="confirm-modal">
+    <div class="confirm-icon" aria-hidden="true">⚠️</div>
+    <div class="confirm-msg" id="confirm-msg">確定執行此動作嗎？</div>
+    <div class="confirm-actions">
+      <button class="confirm-btn danger" onclick="closeConfirm(true)">確定刪除</button>
+      <button class="confirm-btn cancel-btn" onclick="closeConfirm(false)">取消</button>
+    </div>
+  </div>
+</div>
 
 <script src="api.js" defer></script>
 <script src="app.js" defer></script>

@@ -18,6 +18,12 @@ let BUNDLES = [];
 let ADDON_PRODUCTS = [];
 
 let cart = {};
+// 從 localStorage 恢復購物車（重整後不清空）
+try {
+  const _saved = localStorage.getItem('wama_cart');
+  if (_saved) cart = JSON.parse(_saved);
+} catch (_e) { cart = {}; }
+
 let selectedChips = [];
 let currentFilter = 'all';
 let currentVisibility = 'public';
@@ -80,6 +86,9 @@ async function doLogin() {
     if (result.user.role === 'dealer') {
       document.getElementById('dealer-welcome').textContent = `歡迎，${result.user.displayName}`;
       setTimeout(() => switchPage('dealer'), 400);
+    }
+    if (result.user.role === 'admin') {
+      setTimeout(() => switchPage('admin'), 400);
     }
   } catch (e) {
     err.textContent = '⚠ ' + (e.network ? '無法連線到後端,請確認 API 是否啟動' : (e.message || '登入失敗'));
@@ -155,6 +164,7 @@ function _normalizeBundle(b)  { return { id: b.bundleId, name: b.name, tag: b.ta
 function _normalizeAddon(a)   { return { id: a.addonId, name: a.name, emoji: a.emoji, orig: a.orig, special: a.special, active: a.active }; }
 
 async function reloadCatalog() {
+  renderSkeletons(4);   // 先顯示骨架屏
   try {
     const [pRes, pubBRes, addonsRes] = await Promise.all([
       Api.products(), Api.bundles('public'), Api.addons(),
@@ -274,8 +284,12 @@ function renderBundleCard(b, isDealer) {
 
 /* ============================ ADMIN: BUNDLE ============================ */
 function setVisibility(el, vis) {
-  document.querySelectorAll('.vis-opt').forEach(o => o.classList.remove('active'));
+  document.querySelectorAll('.vis-opt').forEach(o => {
+    o.classList.remove('active');
+    o.setAttribute('aria-checked', 'false');
+  });
   el.classList.add('active');
+  el.setAttribute('aria-checked', 'true');
   currentVisibility = vis;
 }
 
@@ -283,7 +297,10 @@ function renderChipSelector() {
   const el = document.getElementById('prod-selector');
   if (!el) return;
   el.innerHTML = ALL_PRODUCTS.map(p => `
-    <div class="sel-chip ${selectedChips.includes(p.id) ? 'selected' : ''}" onclick="toggleChip(this,${p.id})" role="button" tabindex="0">
+    <div class="sel-chip ${selectedChips.includes(p.id) ? 'selected' : ''}"
+         onclick="toggleChip(this,${p.id})"
+         onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggleChip(this,${p.id})}"
+         role="button" tabindex="0" aria-pressed="${selectedChips.includes(p.id)}">
       <span aria-hidden="true">${p.emoji}</span>${p.name} NT$${p.price}
     </div>`).join('');
 }
@@ -361,12 +378,13 @@ async function toggleBundleActive(id) {
 }
 
 async function deleteBundle(id) {
-  if (!confirm('確定要刪除這個組合包嗎？')) return;
-  try {
-    await Api.adminDeleteBundle(id);
-    await reloadAdminLists();
-    showToast('已刪除組合包', true);
-  } catch (e) { showToast('刪除失敗: ' + e.message, false); }
+  showConfirm('確定要刪除這個組合包嗎？此動作無法復原。', async () => {
+    try {
+      await Api.adminDeleteBundle(id);
+      await reloadAdminLists();
+      showToast('已刪除組合包', true);
+    } catch (e) { showToast('刪除失敗: ' + e.message, false); }
+  }, '🗑️');
 }
 
 function renderBundleAdmin() {
@@ -430,14 +448,15 @@ async function toggleAddonActive(id) {
 }
 
 async function deleteAddon(id) {
-  if (!confirm('確定要刪除這個加價購商品嗎？')) return;
-  try {
-    await Api.adminDeleteAddon(id);
-    const key = 'addon_' + id;
-    if (cart[key]) { delete cart[key]; updateCartBadge(); }
-    await reloadAdminLists();
-    showToast('已刪除加價購商品', true);
-  } catch (e) { showToast('刪除失敗: ' + e.message, false); }
+  showConfirm('確定要刪除這個加價購商品嗎？此動作無法復原。', async () => {
+    try {
+      await Api.adminDeleteAddon(id);
+      const key = 'addon_' + id;
+      if (cart[key]) { delete cart[key]; saveCart(); updateCartBadge(); }
+      await reloadAdminLists();
+      showToast('已刪除加價購商品', true);
+    } catch (e) { showToast('刪除失敗: ' + e.message, false); }
+  }, '🗑️');
 }
 
 function renderAddonAdmin() {
@@ -477,6 +496,7 @@ function parseCartKey(key) {
 function addToCart(key, name, type, price, btnEl) {
   if (!cart[key]) cart[key] = { name, type, price, qty: 0 };
   cart[key].qty++;
+  saveCart();
   updateCartBadge();
   renderCart();
   if (btnEl) flashButton(btnEl);
@@ -487,12 +507,13 @@ function changeQty(key, delta) {
   if (!cart[key]) return;
   cart[key].qty = Math.max(0, cart[key].qty + delta);
   if (cart[key].qty === 0) delete cart[key];
+  saveCart();
   updateCartBadge();
   renderCart();
 }
 
-function removeItem(key) { delete cart[key]; updateCartBadge(); renderCart(); }
-function clearCart() { cart = {}; updateCartBadge(); renderCart(); }
+function removeItem(key) { delete cart[key]; saveCart(); updateCartBadge(); renderCart(); }
+function clearCart() { cart = {}; saveCart(); updateCartBadge(); renderCart(); }
 
 function updateCartBadge() {
   const total = Object.values(cart).reduce((s, v) => s + v.qty, 0);
@@ -500,6 +521,11 @@ function updateCartBadge() {
   const bb = document.getElementById('bnav-badge');
   bb.textContent = total;
   bb.style.display = total > 0 ? 'inline-block' : 'none';
+}
+
+/* 將購物車寫入 localStorage，達成重整後持久化 */
+function saveCart() {
+  try { localStorage.setItem('wama_cart', JSON.stringify(cart)); } catch (_e) {}
 }
 
 function renderCart() {
@@ -596,6 +622,7 @@ async function checkout() {
     if (result.requirePayment === false) {
       showToast(`✓ 訂貨單已送出 (${result.orderId})`, true);
       cart = {};
+      saveCart();
       updateCartBadge();
       renderCart();
     } else if (result.paymentUrl) {
@@ -663,9 +690,57 @@ function addAddon(addonId, btn) {
   const key = 'addon_' + a.id;
   if (cart[key]) { showToast(`「${a.name}」已在購物車中`, true); return; }
   cart[key] = { name: `${a.emoji} ${a.name}`, type: '加價購', price: a.special, qty: 1 };
+  saveCart();
   updateCartBadge();
   renderCart();
   showToast(`✓ 已加購「${a.name}」省 NT$${a.orig - a.special}！`, true);
+}
+
+/* ============================ CONFIRM MODAL ============================ */
+let _confirmCb = null;
+
+function showConfirm(msg, onConfirm, icon) {
+  const overlay = document.getElementById('confirm-overlay');
+  if (!overlay) { if (confirm(msg)) onConfirm(); return; }
+  overlay.querySelector('.confirm-icon').textContent = icon || '⚠️';
+  overlay.querySelector('.confirm-msg').textContent = msg;
+  _confirmCb = onConfirm;
+  overlay.classList.add('active');
+}
+
+function closeConfirm(doIt) {
+  const overlay = document.getElementById('confirm-overlay');
+  if (overlay) overlay.classList.remove('active');
+  if (doIt && _confirmCb) _confirmCb();
+  _confirmCb = null;
+}
+
+/* ============================ LOADING / SKELETON ============================ */
+function showLoading(msg) {
+  const el = document.getElementById('loading-overlay');
+  if (!el) return;
+  el.querySelector('.loading-text').textContent = msg || '載入中…';
+  el.classList.add('active');
+}
+
+function hideLoading() {
+  const el = document.getElementById('loading-overlay');
+  if (el) el.classList.remove('active');
+}
+
+function renderSkeletons(count) {
+  const n = count || 4;
+  const skeletonHtml = Array(n).fill(0).map(() => `
+    <div class="product-skeleton">
+      <div class="skeleton-img"></div>
+      <div class="skeleton-line"></div>
+      <div class="skeleton-line short"></div>
+      <div class="skeleton-line price"></div>
+    </div>`).join('');
+  ['products-grid', 'bundle-grid-shop'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.innerHTML = skeletonHtml;
+  });
 }
 
 /* ============================ STATS & TOAST ============================ */
@@ -700,6 +775,7 @@ function handlePaymentRedirect() {
     if (status === 'success') {
       showToast(`✓ 訂單 ${orderId || ''} 付款成功!`, true);
       cart = {};
+      saveCart();
       updateCartBadge();
       renderCart();
       switchPage('cart');
@@ -714,6 +790,7 @@ function handlePaymentRedirect() {
 
 /* ============================ INIT ============================ */
 async function init() {
+  showLoading('商品載入中…');
   renderChipSelector();
   updatePreview();
   await tryRestoreSession();
@@ -722,6 +799,7 @@ async function init() {
   updateRolePill();
   renderCart();
   handlePaymentRedirect();
+  hideLoading();
 }
 
 init().catch(e => {
