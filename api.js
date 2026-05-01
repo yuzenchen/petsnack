@@ -152,6 +152,12 @@
     adminListProducts() {
       return this._fetch('/admin/products');
     },
+    adminUpdateProduct(productId, data) {
+      return this._fetch('/admin/products/' + productId, {
+        method: 'PATCH',
+        body: JSON.stringify(data),
+      });
+    },
     adminUpdateProductStock(productId, stock) {
       return this._fetch('/admin/products/' + productId + '/stock', {
         method: 'PATCH',

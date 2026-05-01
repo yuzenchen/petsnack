@@ -566,6 +566,8 @@ function updatePreview() {
 
 function resetBundleForm() {
   document.getElementById('b-name').value = '';
+  const imgEl = document.getElementById('b-imageUrl'); if (imgEl) imgEl.value = '';
+  const descEl = document.getElementById('b-description'); if (descEl) descEl.value = '';
   document.getElementById('disc-slider').value = 15;
   selectedChips = [];
   currentVisibility = 'public';
@@ -581,8 +583,10 @@ async function saveBundle() {
   if (selectedChips.length < 2) { showToast('請至少選擇 2 件商品！', false); return; }
   const disc = parseInt(document.getElementById('disc-slider').value, 10);
   const tag = document.getElementById('b-tag').value;
+  const imageUrl = document.getElementById('b-imageUrl')?.value.trim() || undefined;
+  const description = document.getElementById('b-description')?.value.trim() || undefined;
   try {
-    await Api.adminCreateBundle({ name, tag, items: selectedChips, disc, visibility: currentVisibility, active: true });
+    await Api.adminCreateBundle({ name, tag, imageUrl, description, items: selectedChips, disc, visibility: currentVisibility, active: true });
     resetBundleForm();
     await reloadAdminLists();
     const v = currentVisibility === 'public' ? '🌐 公開' : '💼 經銷限定';
@@ -1509,18 +1513,37 @@ function renderStockList() {
     const status = stock === 0 ? 'out' : (stock <= threshold ? 'low' : 'ok');
     const badge = stockBadgeHtml(stock, threshold, item.trackStock);
     const idAttr = type === 'addon' ? `data-addon-id="${item.id}"` : `data-product-id="${item.id}"`;
+    const metaPanel = type === 'product' ? `
+        <div class="prod-meta-edit" id="meta-${item.id}" style="display:none;grid-column:1/-1;padding:10px 14px;background:#fafafa;border-top:1px dashed var(--border);">
+          <div style="display:grid;gap:8px;">
+            <label style="font-size:12px;color:var(--text-light)">圖片網址
+              <input type="url" class="meta-imageUrl" value="${escHtml(item.imageUrl || '')}" placeholder="https://..." style="width:100%;padding:6px;border:1px solid var(--border);border-radius:4px;font:inherit">
+            </label>
+            <label style="font-size:12px;color:var(--text-light)">描述
+              <textarea class="meta-description" rows="2" placeholder="商品介紹" style="width:100%;padding:6px;border:1px solid var(--border);border-radius:4px;font:inherit;resize:vertical">${escHtml(item.description || '')}</textarea>
+            </label>
+            <div style="text-align:right">
+              <button class="pill-btn green" onclick="saveProductMeta(${item.id})">儲存</button>
+            </div>
+          </div>
+        </div>` : '';
+    const metaToggle = type === 'product'
+      ? `<button class="pill-btn gray" onclick="toggleProductMeta(${item.id})" title="編輯圖片/描述">✎</button>`
+      : '';
     return `
-      <div class="bundle-list-item stock-row ${status === 'ok' ? '' : 'stock-warn'}">
-        <div class="bli-emojis" aria-hidden="true">${item.emoji}</div>
+      <div class="bundle-list-item stock-row ${status === 'ok' ? '' : 'stock-warn'}" style="display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:10px;">
+        <div class="bli-emojis" aria-hidden="true">${escHtml(item.emoji)}</div>
         <div class="bli-info">
-          <div class="bli-name">${item.name} ${badge}</div>
+          <div class="bli-name">${escHtml(item.name)} ${badge}</div>
           <div class="bli-sub">${type === 'addon' ? '🎁 加價購' : '單品'} · 警示線:${threshold}</div>
         </div>
-        <div class="stock-edit">
+        <div class="stock-edit" style="display:flex;gap:6px;align-items:center;">
           <input type="number" min="0" max="99999" class="stock-input" value="${stock}" ${idAttr} aria-label="庫存數量"
                  onkeypress="if(event.key==='Enter')saveStockChange(this)">
           <button class="pill-btn green" onclick="saveStockChange(this.previousElementSibling)" title="儲存">儲存</button>
+          ${metaToggle}
         </div>
+        ${metaPanel}
       </div>`;
   };
 
@@ -1528,6 +1551,27 @@ function renderStockList() {
     ${products.map((p) => renderRow(p, 'product')).join('')}
     ${addons.map((a) => renderRow(a, 'addon')).join('')}
   `;
+}
+
+function toggleProductMeta(productId) {
+  const panel = document.getElementById('meta-' + productId);
+  if (!panel) return;
+  panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+}
+
+async function saveProductMeta(productId) {
+  const panel = document.getElementById('meta-' + productId);
+  if (!panel) return;
+  const imageUrl = panel.querySelector('.meta-imageUrl').value.trim();
+  const description = panel.querySelector('.meta-description').value.trim();
+  try {
+    await Api.adminUpdateProduct(productId, { imageUrl, description });
+    showToast('✓ 商品資訊已更新', true);
+    await loadStockList();
+    reloadCatalog();
+  } catch (e) {
+    showToast('更新失敗: ' + e.message, false);
+  }
 }
 
 async function saveStockChange(input) {
