@@ -230,6 +230,9 @@
     <div class="stat-card"><div class="stat-emoji">🎀</div><div class="stat-value" id="stat-addon">0</div><div class="stat-label">加價購</div></div>
     <div class="stat-card"><div class="stat-emoji">💰</div><div class="stat-value" id="stat-revenue">—</div><div class="stat-label">本月營收</div></div>
     <div class="stat-card"><div class="stat-emoji">📦</div><div class="stat-value" id="stat-pending">—</div><div class="stat-label">待出貨</div></div>
+    <div class="stat-card stat-warning" id="stat-lowstock-card" style="cursor:pointer" onclick="document.getElementById('stock-admin-card').scrollIntoView({behavior:'smooth'})" title="點擊查看低庫存商品">
+      <div class="stat-emoji">⚠️</div><div class="stat-value" id="stat-lowstock">—</div><div class="stat-label">低庫存警示</div>
+    </div>
   </div>
 
   <!-- 新增組合包 -->
@@ -281,6 +284,22 @@
   <div class="admin-card">
     <div class="admin-card-hd"><h3>📋 現有組合包</h3></div>
     <div id="bundle-admin-list"></div>
+  </div>
+
+  <!-- 商品庫存管理 -->
+  <div class="admin-card" id="stock-admin-card">
+    <div class="admin-card-hd">
+      <h3>📦 商品庫存管理</h3>
+      <div style="display:flex;gap:8px;align-items:center">
+        <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text-light);cursor:pointer">
+          <input type="checkbox" id="stock-show-low-only" onchange="renderStockList()"> 只看低庫存
+        </label>
+        <button class="pill-btn gray" onclick="loadStockList()" title="重新整理">🔄</button>
+      </div>
+    </div>
+    <div id="stock-admin-list">
+      <div class="bundle-admin-empty">載入中...</div>
+    </div>
   </div>
 
   <!-- 加價購管理 -->

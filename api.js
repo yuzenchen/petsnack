@@ -148,6 +148,26 @@
       return this._fetch('/orders/' + encodeURIComponent(orderId));
     },
 
+    /* ---------- Admin: Stock ---------- */
+    adminListProducts() {
+      return this._fetch('/admin/products');
+    },
+    adminUpdateProductStock(productId, stock) {
+      return this._fetch('/admin/products/' + productId + '/stock', {
+        method: 'PATCH',
+        body: JSON.stringify({ stock }),
+      });
+    },
+    adminUpdateAddonStock(addonId, stock) {
+      return this._fetch('/admin/addons/' + encodeURIComponent(addonId) + '/stock', {
+        method: 'PATCH',
+        body: JSON.stringify({ stock }),
+      });
+    },
+    adminLowStock() {
+      return this._fetch('/admin/stock/low');
+    },
+
     /* ---------- Admin: Order management ---------- */
     adminUpdateOrderStatus(orderId, status) {
       return this._fetch('/admin/orders/' + encodeURIComponent(orderId) + '/status', {

@@ -170,9 +170,45 @@ function bundleScroll() {
 }
 
 /* ============================ DATA RELOAD ============================ */
-function _normalizeProduct(p) { return { id: p.productId, name: p.name, sub: p.sub, emoji: p.emoji, price: p.price, orig: p.orig, badge: p.badge, type: p.type }; }
+function _normalizeProduct(p) {
+  return {
+    id: p.productId, name: p.name, sub: p.sub, emoji: p.emoji,
+    price: p.price, orig: p.orig, badge: p.badge, type: p.type,
+    stock: p.stock, lowStockThreshold: p.lowStockThreshold,
+    trackStock: p.trackStock, stockStatus: p.stockStatus,
+  };
+}
 function _normalizeBundle(b)  { return { id: b.bundleId, name: b.name, tag: b.tag, items: b.items, disc: b.disc, visibility: b.visibility, active: b.active }; }
-function _normalizeAddon(a)   { return { id: a.addonId, name: a.name, emoji: a.emoji, orig: a.orig, special: a.special, active: a.active }; }
+function _normalizeAddon(a) {
+  return {
+    id: a.addonId, name: a.name, emoji: a.emoji,
+    orig: a.orig, special: a.special, active: a.active,
+    stock: a.stock, lowStockThreshold: a.lowStockThreshold,
+    trackStock: a.trackStock, stockStatus: a.stockStatus,
+  };
+}
+
+/* 計算組合包 availableStock = MIN(items 的 stock) */
+function bundleAvailableStock(b) {
+  if (!b.items?.length) return 0;
+  let min = Infinity;
+  for (const id of b.items) {
+    const p = getProduct(id);
+    if (!p) return 0;
+    if (p.trackStock === false) continue;
+    if (p.stock < min) min = p.stock;
+  }
+  return Number.isFinite(min) ? min : 999;
+}
+
+/* 共用:渲染 stock badge HTML */
+function stockBadgeHtml(stockOrItem, lowThreshold = 5, trackStock = true) {
+  const stock = typeof stockOrItem === 'number' ? stockOrItem : (stockOrItem?.stock ?? 0);
+  if (trackStock === false) return '';
+  if (stock <= 0) return '<span class="stock-badge out">缺貨</span>';
+  if (stock <= lowThreshold) return `<span class="stock-badge low">僅剩 ${stock} 件</span>`;
+  return '<span class="stock-badge ok">有現貨</span>';
+}
 
 async function reloadCatalog() {
   renderSkeletons(4);   // 先顯示骨架屏
@@ -211,9 +247,10 @@ async function reloadAdminLists() {
     updateStats();
     renderBundleShop();
     renderBundleDealer();
-    // 訂單管理 + 真實統計 (並行載入,不阻塞 UI)
+    // 訂單管理 + 真實統計 + 庫存列表 (並行載入,不阻塞 UI)
     loadOrders();
     loadDashboardStats();
+    loadStockList();
   } catch (e) {
     console.error(e);
     showToast('讀取後台資料失敗: ' + (e.message || ''), false);
@@ -234,8 +271,12 @@ function renderProducts() {
   const list = currentFilter === 'all' ? ALL_PRODUCTS
     : ALL_PRODUCTS.filter(p => p.type === currentFilter || p.type === 'both');
   const lbl = { new: '新品', hot: '熱賣', sale: '優惠' };
-  grid.innerHTML = list.map(p => `
-    <article class="product-card">
+  grid.innerHTML = list.map(p => {
+    const tracked = p.trackStock !== false;
+    const isOut = tracked && (p.stock ?? 0) <= 0;
+    const badge = stockBadgeHtml(p.stock, p.lowStockThreshold ?? 5, p.trackStock);
+    return `
+    <article class="product-card${isOut ? ' is-out' : ''}">
       ${p.badge ? `<span class="product-badge ${p.badge}">${lbl[p.badge]}</span>` : ''}
       <div class="product-img" aria-hidden="true">${p.emoji}</div>
       <div class="product-info">
@@ -245,9 +286,11 @@ function renderProducts() {
           <span class="price-sale">NT$ ${p.price}</span>
           ${p.orig ? `<span class="price-regular">NT$ ${p.orig}</span>` : ''}
         </div>
+        ${badge}
       </div>
-      <button class="add-cart-btn" onclick="addToCart('prod_${p.id}','${p.emoji} ${p.name}','單品',${p.price},this)">加入購物車</button>
-    </article>`).join('');
+      <button class="add-cart-btn" ${isOut ? 'disabled aria-disabled="true"' : ''} onclick="addToCart('prod_${p.id}','${p.emoji} ${p.name}','單品',${p.price},this)">${isOut ? '缺貨中' : '加入購物車'}</button>
+    </article>`;
+  }).join('');
 }
 
 /* ============================ BUNDLES ============================ */
@@ -277,8 +320,11 @@ function renderBundleCard(b, isDealer) {
   const names = items.map(p => p.name).join(' + ');
   const key = 'bundle_' + b.id;
   const type = isDealer ? '經銷組合包' : '組合包';
+  const avail = bundleAvailableStock(b);
+  const isOut = avail <= 0;
+  const badge = stockBadgeHtml(avail, 5);
   return `
-    <article class="product-card bundle-card ${isDealer ? 'dealer' : ''}">
+    <article class="product-card bundle-card ${isDealer ? 'dealer' : ''}${isOut ? ' is-out' : ''}">
       ${isDealer ? '<span class="bundle-vip-tag">VIP</span>' : ''}
       <span class="bundle-ribbon">${b.disc}% OFF</span>
       <div class="product-img" aria-hidden="true"><span class="bundle-emojis-row">${emojis}</span></div>
@@ -291,8 +337,9 @@ function renderBundleCard(b, isDealer) {
           <span class="price-regular">NT$ ${orig}</span>
         </div>
         <span class="bundle-save">省 NT$${save}</span>
+        ${badge}
       </div>
-      <button class="add-cart-btn" onclick="addToCart('${key}','${emojis} ${b.name}','${type}',${final},this)">加入購物車</button>
+      <button class="add-cart-btn" ${isOut ? 'disabled aria-disabled="true"' : ''} onclick="addToCart('${key}','${emojis} ${b.name}','${type}',${final},this)">${isOut ? '缺貨中' : '加入購物車'}</button>
     </article>`;
 }
 
@@ -757,16 +804,24 @@ function renderAddonSection() {
     const key = 'addon_' + a.id;
     const added = !!cart[key];
     const save = a.orig - a.special;
+    const tracked = a.trackStock !== false;
+    const isOut = tracked && (a.stock ?? 0) <= 0;
+    const badge = stockBadgeHtml(a.stock, a.lowStockThreshold ?? 5, a.trackStock);
+    let label;
+    if (isOut) label = '缺貨';
+    else if (added) label = '已加入 ✓';
+    else label = `加購省 $${save} +`;
     return `
-      <div class="addon-card ${added ? 'added' : ''}">
+      <div class="addon-card ${added ? 'added' : ''}${isOut ? ' is-out' : ''}">
         <div class="addon-emoji" aria-hidden="true">${a.emoji}</div>
         <div class="addon-name">${a.name}</div>
         <div class="addon-price-row">
           <span class="addon-orig">NT$${a.orig}</span>
           <span class="addon-special">NT$${a.special}</span>
         </div>
-        <button class="addon-add-btn" ${added ? 'disabled aria-pressed="true"' : 'aria-pressed="false"'} onclick="addAddon('${a.id}',this)">
-          ${added ? '已加入 ✓' : `加購省 $${save} +`}
+        ${badge}
+        <button class="addon-add-btn" ${(added || isOut) ? 'disabled' : 'aria-pressed="false"'} onclick="addAddon('${a.id}',this)">
+          ${label}
         </button>
       </div>`;
   }).join('');
@@ -1131,8 +1186,103 @@ async function loadDashboardStats() {
     setText('stat-addon', stats.catalog.addons);
     setText('stat-revenue', 'NT$' + (stats.month.revenue || 0).toLocaleString());
     setText('stat-pending', stats.pendingShipping);
-  } catch (_) {
-    // 失敗時 keep 原本 0,不打擾使用者
+    setText('stat-lowstock', stats.lowStockCount ?? 0);
+    // 警示卡視覺強調
+    const card = document.getElementById('stat-lowstock-card');
+    if (card) card.classList.toggle('alert', (stats.lowStockCount ?? 0) > 0);
+  } catch (_) { /* keep 原本 0 */ }
+}
+
+/* ============================================================
+   STOCK MANAGEMENT (admin)
+   ============================================================ */
+let _adminStockCache = { products: [], addons: [] };
+
+async function loadStockList() {
+  if (!currentUser || currentUser.role !== 'admin') return;
+  const el = document.getElementById('stock-admin-list');
+  if (!el) return;
+  el.innerHTML = '<div class="bundle-admin-empty">載入中...</div>';
+  try {
+    const [prodRes, addonRes] = await Promise.all([
+      Api.adminListProducts(),
+      Api.adminListAddons(),
+    ]);
+    _adminStockCache.products = prodRes.products.map(_normalizeProduct);
+    _adminStockCache.addons = addonRes.addons.map(_normalizeAddon);
+    renderStockList();
+  } catch (e) {
+    el.innerHTML = `<div class="bundle-admin-empty">載入失敗: ${e.message}</div>`;
+  }
+}
+
+function renderStockList() {
+  const el = document.getElementById('stock-admin-list');
+  if (!el) return;
+  const lowOnly = document.getElementById('stock-show-low-only')?.checked;
+
+  const filterFn = (item) => {
+    if (item.trackStock === false) return false;  // 不追蹤的不顯示
+    if (!lowOnly) return true;
+    return (item.stock ?? 0) <= (item.lowStockThreshold ?? 5);
+  };
+
+  const products = _adminStockCache.products.filter(filterFn);
+  const addons = _adminStockCache.addons.filter(filterFn);
+
+  if (!products.length && !addons.length) {
+    el.innerHTML = `<div class="bundle-admin-empty">${lowOnly ? '👍 沒有低庫存商品' : '無商品'}</div>`;
+    return;
+  }
+
+  const renderRow = (item, type) => {
+    const stock = item.stock ?? 0;
+    const threshold = item.lowStockThreshold ?? 5;
+    const status = stock === 0 ? 'out' : (stock <= threshold ? 'low' : 'ok');
+    const badge = stockBadgeHtml(stock, threshold, item.trackStock);
+    const idAttr = type === 'addon' ? `data-addon-id="${item.id}"` : `data-product-id="${item.id}"`;
+    return `
+      <div class="bundle-list-item stock-row ${status === 'ok' ? '' : 'stock-warn'}">
+        <div class="bli-emojis" aria-hidden="true">${item.emoji}</div>
+        <div class="bli-info">
+          <div class="bli-name">${item.name} ${badge}</div>
+          <div class="bli-sub">${type === 'addon' ? '🎁 加價購' : '單品'} · 警示線:${threshold}</div>
+        </div>
+        <div class="stock-edit">
+          <input type="number" min="0" max="99999" class="stock-input" value="${stock}" ${idAttr} aria-label="庫存數量"
+                 onkeypress="if(event.key==='Enter')saveStockChange(this)">
+          <button class="pill-btn green" onclick="saveStockChange(this.previousElementSibling)" title="儲存">儲存</button>
+        </div>
+      </div>`;
+  };
+
+  el.innerHTML = `
+    ${products.map((p) => renderRow(p, 'product')).join('')}
+    ${addons.map((a) => renderRow(a, 'addon')).join('')}
+  `;
+}
+
+async function saveStockChange(input) {
+  const stock = parseInt(input.value, 10);
+  if (Number.isNaN(stock) || stock < 0) {
+    showToast('請輸入 >= 0 的整數', false);
+    return;
+  }
+  const productId = input.getAttribute('data-product-id');
+  const addonId = input.getAttribute('data-addon-id');
+  try {
+    if (productId) {
+      await Api.adminUpdateProductStock(Number(productId), stock);
+    } else if (addonId) {
+      await Api.adminUpdateAddonStock(addonId, stock);
+    }
+    showToast('✓ 庫存已更新', true);
+    // 重新載入,順便更新 dashboard 警示
+    await loadStockList();
+    loadDashboardStats();
+    reloadCatalog(); // 商店端的 stock badge 也跟著更新
+  } catch (e) {
+    showToast('更新失敗: ' + e.message, false);
   }
 }
 
