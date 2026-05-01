@@ -54,6 +54,12 @@ function closeLoginModal() {
 }
 
 document.addEventListener('keydown', function (e) {
+  // 訂單 modal: Escape 關閉
+  const orderM = document.getElementById('order-modal');
+  if (orderM && orderM.classList.contains('active')) {
+    if (e.key === 'Escape') { e.preventDefault(); closeOrderModal(); return; }
+  }
+  // 登入 modal: Escape 關閉 + focus trap
   const m = document.getElementById('login-modal');
   if (!m || !m.classList.contains('active')) return;
   if (e.key === 'Escape') { e.preventDefault(); closeLoginModal(); return; }
@@ -200,6 +206,9 @@ async function reloadAdminLists() {
     updateStats();
     renderBundleShop();
     renderBundleDealer();
+    // 訂單管理 + 真實統計 (並行載入,不阻塞 UI)
+    loadOrders();
+    loadDashboardStats();
   } catch (e) {
     console.error(e);
     showToast('讀取後台資料失敗: ' + (e.message || ''), false);
@@ -741,6 +750,303 @@ function renderSkeletons(count) {
     const el = document.getElementById(id);
     if (el) el.innerHTML = skeletonHtml;
   });
+}
+
+/* ============================================================
+   ORDER MANAGEMENT (admin)
+   ============================================================ */
+const STATUS_LABEL = {
+  created: '新建', paid: '已付款', processing: '處理中',
+  shipped: '已出貨', delivered: '已送達', cancelled: '已取消',
+};
+const STATUS_CLASS = {
+  created: 's-pend', paid: 's-paid', processing: 's-pend',
+  shipped: 's-ship', delivered: 's-paid', cancelled: 's-cancel',
+};
+const NEXT_STATUS = {
+  created: 'paid', paid: 'processing', processing: 'shipped', shipped: 'delivered',
+};
+
+let orderState = { page: 1, limit: 20, status: '', orderType: '', q: '', total: 0 };
+let _orderSearchTimer = null;
+
+function onOrderFilterChange() {
+  // debounce 350ms
+  clearTimeout(_orderSearchTimer);
+  _orderSearchTimer = setTimeout(() => {
+    orderState.page = 1;
+    orderState.q = document.getElementById('order-search')?.value.trim() || '';
+    orderState.status = document.getElementById('order-filter-status')?.value || '';
+    orderState.orderType = document.getElementById('order-filter-type')?.value || '';
+    loadOrders();
+  }, 350);
+}
+
+async function loadOrders(page) {
+  if (page) orderState.page = page;
+  if (!currentUser || currentUser.role !== 'admin') return;
+
+  const el = document.getElementById('order-list-container');
+  if (!el) return;
+  el.innerHTML = '<div class="bundle-admin-empty">載入中...</div>';
+
+  try {
+    const params = {
+      page: orderState.page,
+      limit: orderState.limit,
+    };
+    if (orderState.status) params.status = orderState.status;
+    if (orderState.orderType) params.orderType = orderState.orderType;
+    if (orderState.q) params.q = orderState.q;
+
+    const res = await Api.listOrders(params);
+    orderState.total = res.pagination.total;
+    renderOrderList(res.orders);
+    renderOrderPagination(res.pagination);
+  } catch (e) {
+    el.innerHTML = `<div class="bundle-admin-empty">載入失敗:${e.message}</div>`;
+  }
+}
+
+function renderOrderList(orders) {
+  const el = document.getElementById('order-list-container');
+  if (!orders.length) {
+    el.innerHTML = '<div class="bundle-admin-empty">沒有符合條件的訂單</div>';
+    return;
+  }
+  el.innerHTML = `
+    <div class="table-wrap">
+      <table class="order-table">
+        <thead><tr>
+          <th>訂單編號</th><th>類型</th><th>顧客 / 店家</th>
+          <th style="text-align:right">金額</th><th>付款</th><th>狀態</th><th>建立時間</th>
+        </tr></thead>
+        <tbody>
+          ${orders.map(o => {
+            const isDealer = o.orderType === 'dealer';
+            const customerName = isDealer
+              ? (o.dealer?.shopName || '-')
+              : (o.customer?.email || o.customer?.name || '-');
+            const ts = new Date(o.createdAt).toLocaleString('zh-TW', { year: '2-digit', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
+            return `
+              <tr onclick="openOrderModal('${encodeURIComponent(o.orderId)}')" style="cursor:pointer" title="點擊查看詳情">
+                <td><code style="font-size:12px">${o.orderId}</code></td>
+                <td><span class="order-status ${isDealer ? 's-dealer' : 's-pend'}">${isDealer ? '經銷' : '一般'}</span></td>
+                <td>${customerName}</td>
+                <td style="text-align:right;font-weight:700">NT$${o.totalAmount.toLocaleString()}</td>
+                <td><span class="order-status ${o.payment.status === 'paid' ? 's-paid' : o.payment.status === 'failed' ? 's-cancel' : 's-pend'}">${o.payment.status}</span></td>
+                <td><span class="order-status ${STATUS_CLASS[o.status] || 's-pend'}">${STATUS_LABEL[o.status] || o.status}</span></td>
+                <td style="font-size:12px;color:var(--text-light)">${ts}</td>
+              </tr>`;
+          }).join('')}
+        </tbody>
+      </table>
+    </div>`;
+}
+
+function renderOrderPagination(p) {
+  const el = document.getElementById('order-pagination');
+  if (!el) return;
+  if (p.pages <= 1) { el.innerHTML = ''; return; }
+  const prev = p.page > 1 ? `<button class="pill-btn" onclick="loadOrders(${p.page - 1})">上一頁</button>` : '';
+  const next = p.page < p.pages ? `<button class="pill-btn" onclick="loadOrders(${p.page + 1})">下一頁</button>` : '';
+  el.innerHTML = `${prev}<span class="page-info">第 ${p.page} / ${p.pages} 頁 (共 ${p.total} 筆)</span>${next}`;
+}
+
+/* ---------- 訂單詳情 modal ---------- */
+async function openOrderModal(orderIdEnc) {
+  const orderId = decodeURIComponent(orderIdEnc);
+  const modal = document.getElementById('order-modal');
+  const body = document.getElementById('order-modal-body');
+  modal.classList.add('active');
+  modal.setAttribute('aria-hidden', 'false');
+  body.innerHTML = '<p class="modal-sub">載入中...</p>';
+  try {
+    const { order } = await Api.getOrder(orderId);
+    body.innerHTML = renderOrderDetail(order);
+  } catch (e) {
+    body.innerHTML = `<p style="color:var(--red)">載入失敗:${e.message}</p>`;
+  }
+}
+
+function closeOrderModal() {
+  const m = document.getElementById('order-modal');
+  m.classList.remove('active');
+  m.setAttribute('aria-hidden', 'true');
+}
+
+function renderOrderDetail(o) {
+  const isDealer = o.orderType === 'dealer';
+  const items = (o.items || []).map(i => `
+    <li>
+      <span class="item-name">${i.name}</span>
+      <span class="item-qty">×${i.qty}</span>
+      <span class="item-price">NT$${(i.price * i.qty).toLocaleString()}</span>
+    </li>
+  `).join('');
+
+  const next = NEXT_STATUS[o.status];
+  const canRefund = o.payment?.status === 'paid' && o.status !== 'cancelled';
+
+  const customerHtml = isDealer
+    ? `<div><b>店家:</b> ${o.dealer?.shopName || '-'}</div>
+       <div><b>聯絡人:</b> ${o.dealer?.contact || '-'}</div>
+       <div><b>電話:</b> ${o.dealer?.phone || '-'}</div>
+       <div><b>預計交貨:</b> ${o.dealer?.deliveryDate || '-'}</div>
+       <div><b>備註:</b> ${o.dealer?.note || '-'}</div>`
+    : `<div><b>姓名:</b> ${o.customer?.name || '-'}</div>
+       <div><b>Email:</b> ${o.customer?.email || '-'}</div>
+       <div><b>電話:</b> ${o.customer?.phone || '-'}</div>`;
+
+  return `
+    <div class="order-detail">
+      <div class="od-section">
+        <div class="od-row"><span>訂單編號</span><code>${o.orderId}</code></div>
+        <div class="od-row"><span>類型</span><span class="order-status ${isDealer ? 's-dealer' : 's-pend'}">${isDealer ? '經銷' : '一般'}</span></div>
+        <div class="od-row"><span>狀態</span><span class="order-status ${STATUS_CLASS[o.status] || 's-pend'}">${STATUS_LABEL[o.status] || o.status}</span></div>
+        <div class="od-row"><span>付款</span><span class="order-status ${o.payment?.status === 'paid' ? 's-paid' : 's-pend'}">${o.payment?.status || '-'}</span></div>
+        <div class="od-row"><span>建立</span>${new Date(o.createdAt).toLocaleString('zh-TW')}</div>
+        ${o.payment?.paidAt ? `<div class="od-row"><span>付款於</span>${new Date(o.payment.paidAt).toLocaleString('zh-TW')}</div>` : ''}
+      </div>
+
+      <div class="od-section">
+        <h4 class="od-title">商品明細</h4>
+        <ul class="od-items">${items}</ul>
+        <div class="od-totals">
+          <div><span>小計</span><span>NT$${o.subtotal.toLocaleString()}</span></div>
+          <div><span>運費</span><span>NT$${o.shipping.toLocaleString()}</span></div>
+          <div class="od-grand"><span>合計</span><span>NT$${o.totalAmount.toLocaleString()}</span></div>
+        </div>
+      </div>
+
+      <div class="od-section">
+        <h4 class="od-title">${isDealer ? '經銷資訊' : '顧客資訊'}</h4>
+        ${customerHtml}
+      </div>
+
+      <div class="od-section">
+        <h4 class="od-title">物流資訊</h4>
+        <div class="od-row"><span>方式</span>${o.shippingMethod || '-'}</div>
+        <div class="od-row"><span>地址</span>${o.shippingInfo?.address || '-'}</div>
+        <div class="od-form">
+          <label for="tracking-input">物流單號</label>
+          <input type="text" id="tracking-input" value="${o.shippingInfo?.trackingNo || ''}" placeholder="例: 9999-1234-5678">
+          <button class="pill-btn green" onclick="saveTracking('${encodeURIComponent(o.orderId)}')">儲存單號</button>
+        </div>
+      </div>
+
+      ${o.payment?.transactionId ? `
+      <div class="od-section">
+        <h4 class="od-title">金流</h4>
+        <div class="od-row"><span>方式</span>${o.payment.method}</div>
+        <div class="od-row"><span>Transaction ID</span><code style="font-size:11px">${o.payment.transactionId}</code></div>
+      </div>` : ''}
+
+      <div class="od-actions">
+        ${next ? `<button class="pill-btn green" onclick="advanceOrderStatus('${encodeURIComponent(o.orderId)}','${next}')">→ 標記為「${STATUS_LABEL[next]}」</button>` : ''}
+        ${o.status !== 'cancelled' ? `<button class="pill-btn gray" onclick="advanceOrderStatus('${encodeURIComponent(o.orderId)}','cancelled')">取消訂單</button>` : ''}
+        ${canRefund ? `<button class="pill-btn" style="background:var(--red-light);color:var(--red)" onclick="refundOrder('${encodeURIComponent(o.orderId)}')">💸 退款</button>` : ''}
+      </div>
+    </div>
+  `;
+}
+
+async function advanceOrderStatus(orderIdEnc, newStatus) {
+  const orderId = decodeURIComponent(orderIdEnc);
+  if (newStatus === 'cancelled' && !confirm(`確定取消訂單 ${orderId}?`)) return;
+  try {
+    await Api.adminUpdateOrderStatus(orderId, newStatus);
+    showToast(`✓ 狀態已更新:${STATUS_LABEL[newStatus]}`, true);
+    closeOrderModal();
+    loadOrders();
+    loadDashboardStats();
+  } catch (e) {
+    showToast('狀態更新失敗:' + e.message, false);
+  }
+}
+
+async function saveTracking(orderIdEnc) {
+  const orderId = decodeURIComponent(orderIdEnc);
+  const trackingNo = document.getElementById('tracking-input')?.value.trim() || '';
+  try {
+    await Api.adminUpdateOrderTracking(orderId, { trackingNo });
+    showToast('✓ 物流單號已更新', true);
+  } catch (e) {
+    showToast('更新失敗:' + e.message, false);
+  }
+}
+
+async function refundOrder(orderIdEnc) {
+  const orderId = decodeURIComponent(orderIdEnc);
+  if (!confirm(`確定要對訂單 ${orderId} 退款?\n此動作會呼叫 LINE Pay Refund API,實際扣款將返還給顧客。`)) return;
+  try {
+    await Api.adminRefundOrder(orderId);
+    showToast('✓ 退款已送出', true);
+    closeOrderModal();
+    loadOrders();
+    loadDashboardStats();
+  } catch (e) {
+    showToast('退款失敗:' + e.message, false);
+  }
+}
+
+/* ---------- CSV 匯出 ---------- */
+async function exportOrdersCSV() {
+  try {
+    // 抓當前篩選條件下「全部」訂單 (最多 1000 筆,避免太大)
+    const params = { page: 1, limit: 1000 };
+    if (orderState.status) params.status = orderState.status;
+    if (orderState.orderType) params.orderType = orderState.orderType;
+    if (orderState.q) params.q = orderState.q;
+    const res = await Api.listOrders(params);
+
+    const headers = ['訂單編號', '類型', '狀態', '付款', '小計', '運費', '合計', '顧客/店家', 'Email/電話', '建立時間'];
+    const rows = res.orders.map(o => [
+      o.orderId,
+      o.orderType === 'dealer' ? '經銷' : '一般',
+      STATUS_LABEL[o.status] || o.status,
+      o.payment?.status || '-',
+      o.subtotal,
+      o.shipping,
+      o.totalAmount,
+      o.orderType === 'dealer' ? (o.dealer?.shopName || '') : (o.customer?.name || ''),
+      o.orderType === 'dealer' ? (o.dealer?.phone || '') : (o.customer?.email || ''),
+      new Date(o.createdAt).toISOString(),
+    ]);
+
+    const csv = [headers, ...rows].map(r =>
+      r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(',')
+    ).join('\n');
+
+    // 加 BOM 讓 Excel 開不亂碼
+    const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `orders-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    showToast(`✓ 已匯出 ${rows.length} 筆訂單`, true);
+  } catch (e) {
+    showToast('匯出失敗:' + e.message, false);
+  }
+}
+
+/* ---------- Dashboard 統計 ---------- */
+async function loadDashboardStats() {
+  if (!currentUser || currentUser.role !== 'admin') return;
+  try {
+    const { stats } = await Api.adminStats();
+    const setText = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
+    setText('stat-prod', stats.catalog.products);
+    setText('stat-bundle', stats.catalog.bundlesPublic);
+    setText('stat-dealer', stats.catalog.bundlesDealer);
+    setText('stat-addon', stats.catalog.addons);
+    setText('stat-revenue', 'NT$' + (stats.month.revenue || 0).toLocaleString());
+    setText('stat-pending', stats.pendingShipping);
+  } catch (_) {
+    // 失敗時 keep 原本 0,不打擾使用者
+  }
 }
 
 /* ============================ STATS & TOAST ============================ */

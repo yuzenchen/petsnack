@@ -228,7 +228,8 @@
     <div class="stat-card"><div class="stat-emoji">🎁</div><div class="stat-value" id="stat-bundle">0</div><div class="stat-label">公開組合</div></div>
     <div class="stat-card"><div class="stat-emoji">💼</div><div class="stat-value" id="stat-dealer">0</div><div class="stat-label">經銷組合</div></div>
     <div class="stat-card"><div class="stat-emoji">🎀</div><div class="stat-value" id="stat-addon">0</div><div class="stat-label">加價購</div></div>
-    <div class="stat-card"><div class="stat-emoji">💰</div><div class="stat-value">38,420</div><div class="stat-label">本月營收</div></div>
+    <div class="stat-card"><div class="stat-emoji">💰</div><div class="stat-value" id="stat-revenue">—</div><div class="stat-label">本月營收</div></div>
+    <div class="stat-card"><div class="stat-emoji">📦</div><div class="stat-value" id="stat-pending">—</div><div class="stat-label">待出貨</div></div>
   </div>
 
   <!-- 新增組合包 -->
@@ -298,21 +299,37 @@
     <div id="addon-admin-list"></div>
   </div>
 
-  <!-- 訂單 -->
+  <!-- 訂單管理 -->
   <div class="admin-card">
-    <div class="admin-card-hd"><h3>🧾 最新訂單</h3></div>
-    <div class="table-wrap">
-      <table class="order-table">
-        <thead><tr><th>訂單編號</th><th>類型</th><th>商品</th><th>金額</th><th>狀態</th></tr></thead>
-        <tbody>
-          <tr><td>#D20240420</td><td><span class="order-status s-dealer">經銷</span></td><td>毛孩之家寵物店 x1</td><td>NT$12,800</td><td><span class="order-status s-paid">已付款</span></td></tr>
-          <tr><td>#20240420</td><td><span class="order-status s-pend">一般</span></td><td>雞肉肉乾 x2</td><td>NT$480</td><td><span class="order-status s-paid">已付款</span></td></tr>
-          <tr><td>#D20240419</td><td><span class="order-status s-dealer">經銷</span></td><td>愛寵嚴選 x1</td><td>NT$8,520</td><td><span class="order-status s-ship">運送中</span></td></tr>
-          <tr><td>#20240419</td><td><span class="order-status s-pend">一般</span></td><td>狗狗三寶組 x1</td><td>NT$548</td><td><span class="order-status s-ship">運送中</span></td></tr>
-          <tr><td>#20240418</td><td><span class="order-status s-pend">一般</span></td><td>鮪魚凍乾 x3</td><td>NT$780</td><td><span class="order-status s-pend">待確認</span></td></tr>
-        </tbody>
-      </table>
+    <div class="admin-card-hd">
+      <h3>🧾 訂單管理</h3>
+      <button class="pill-btn" onclick="exportOrdersCSV()" title="匯出當前篩選結果為 CSV">📥 匯出 CSV</button>
     </div>
+
+    <!-- 篩選工具列 -->
+    <div class="order-toolbar">
+      <input type="search" id="order-search" placeholder="搜尋訂單號 / Email / 店名" oninput="onOrderFilterChange()" aria-label="搜尋訂單">
+      <select id="order-filter-status" onchange="onOrderFilterChange()" aria-label="狀態篩選">
+        <option value="">全部狀態</option>
+        <option value="created">新建</option>
+        <option value="paid">已付款</option>
+        <option value="processing">處理中</option>
+        <option value="shipped">已出貨</option>
+        <option value="delivered">已送達</option>
+        <option value="cancelled">已取消</option>
+      </select>
+      <select id="order-filter-type" onchange="onOrderFilterChange()" aria-label="訂單類型">
+        <option value="">所有類型</option>
+        <option value="general">一般</option>
+        <option value="dealer">經銷</option>
+      </select>
+      <button class="pill-btn gray" onclick="loadOrders()" title="重新整理">🔄</button>
+    </div>
+
+    <div id="order-list-container">
+      <div class="bundle-admin-empty">載入訂單中...</div>
+    </div>
+    <div id="order-pagination" class="order-pagination"></div>
   </div>
 </div>
 
@@ -355,6 +372,15 @@
   <button class="bnav-btn" id="bnav-cart" onclick="switchPage('cart')"><span class="bnav-icon" aria-hidden="true">🛒</span>購物車<span class="bnav-badge" id="bnav-badge" style="display:none">0</span></button>
   <button class="bnav-btn admin-only" id="bnav-admin" onclick="switchPage('admin')"><span class="bnav-icon" aria-hidden="true">⚙️</span>後台</button>
 </nav>
+
+<!-- ORDER DETAIL MODAL -->
+<div class="modal-overlay" id="order-modal" role="dialog" aria-modal="true" aria-labelledby="order-modal-title" aria-hidden="true">
+  <div class="modal order-modal">
+    <button class="modal-close" onclick="closeOrderModal()" aria-label="關閉訂單詳情">×</button>
+    <h3 id="order-modal-title">訂單詳情</h3>
+    <div id="order-modal-body"><p class="modal-sub">載入中...</p></div>
+  </div>
+</div>
 
 <!-- LOGIN MODAL -->
 <div class="modal-overlay" id="login-modal" role="dialog" aria-modal="true" aria-labelledby="login-modal-title" aria-hidden="true">

@@ -658,6 +658,89 @@ body.role-admin .bnav-btn.admin-only{display:flex}
 }
 
 /* ============================
+   ORDER MANAGEMENT (admin)
+   ============================ */
+.order-toolbar{
+  display:flex;gap:8px;padding:14px 20px;
+  border-bottom:1px solid var(--border);
+  flex-wrap:wrap;align-items:center;background:var(--bg);
+}
+.order-toolbar input[type=search]{
+  flex:1;min-width:200px;padding:8px 12px;
+  border-radius:6px;border:1.5px solid var(--border);
+  background:var(--white);font:inherit;font-size:13px;
+}
+.order-toolbar select{
+  padding:8px 10px;border-radius:6px;border:1.5px solid var(--border);
+  background:var(--white);font-size:13px;font-weight:500;cursor:pointer;
+}
+.order-toolbar input:focus,.order-toolbar select:focus{
+  outline:none;border-color:var(--primary);
+  box-shadow:0 0 0 3px rgba(216,129,102,0.1);
+}
+.order-status.s-cancel{background:var(--red-light);color:var(--red)}
+.order-table tr[onclick]{cursor:pointer;transition:background .15s}
+.order-table tr[onclick]:hover{background:var(--primary-light) !important}
+.order-pagination{
+  padding:14px 20px;display:flex;gap:10px;align-items:center;justify-content:center;
+  border-top:1px solid var(--border);background:var(--bg);
+}
+.order-pagination .page-info{font-size:13px;color:var(--text-light);font-weight:500}
+
+/* Order detail modal */
+.order-modal{max-width:600px;max-height:85vh;overflow-y:auto}
+.order-detail .od-section{
+  padding:14px 0;border-bottom:1px solid var(--border);
+}
+.order-detail .od-section:last-child{border-bottom:none}
+.order-detail .od-title{
+  font-size:14px;font-weight:700;color:var(--primary);
+  margin-bottom:10px;letter-spacing:1px;
+}
+.order-detail .od-row{
+  display:flex;justify-content:space-between;align-items:center;
+  padding:5px 0;font-size:13px;gap:12px;flex-wrap:wrap;
+}
+.order-detail .od-row > span:first-child{color:var(--text-light);font-weight:500;min-width:80px}
+.order-detail .od-row code{background:var(--bg);padding:3px 7px;border-radius:4px;font-size:12px}
+.order-detail .od-items{
+  list-style:none;margin:0 0 12px;padding:0;
+  background:var(--bg);border-radius:8px;overflow:hidden;
+}
+.order-detail .od-items li{
+  display:flex;justify-content:space-between;align-items:center;
+  padding:9px 12px;border-bottom:1px solid var(--border);font-size:13px;gap:10px;
+}
+.order-detail .od-items li:last-child{border-bottom:none}
+.order-detail .item-name{flex:1;font-weight:500}
+.order-detail .item-qty{color:var(--text-light);min-width:30px;text-align:center}
+.order-detail .item-price{font-weight:700;color:var(--sale);min-width:80px;text-align:right}
+.order-detail .od-totals{
+  background:var(--primary-light);border-radius:8px;padding:12px 14px;
+}
+.order-detail .od-totals > div{
+  display:flex;justify-content:space-between;font-size:13px;margin-bottom:6px;color:var(--text-light);
+}
+.order-detail .od-totals .od-grand{
+  margin-top:8px;padding-top:8px;border-top:1px dashed rgba(216,129,102,0.3);
+  font-size:16px;font-weight:700;color:var(--text);
+}
+.order-detail .od-form{
+  display:flex;gap:8px;align-items:end;margin-top:8px;flex-wrap:wrap;
+}
+.order-detail .od-form input{flex:1;min-width:160px}
+.order-detail .od-actions{
+  display:flex;gap:10px;flex-wrap:wrap;justify-content:flex-end;
+  padding-top:14px;border-top:1px solid var(--border);
+}
+
+@media(max-width:600px){
+  .order-toolbar input[type=search]{min-width:100%}
+  .order-detail .od-row{flex-direction:column;align-items:flex-start;gap:4px}
+  .order-detail .od-row > span:first-child{font-size:11px}
+}
+
+/* ============================
    LOADING OVERLAY & SKELETON
    ============================ */
 .loading-overlay{

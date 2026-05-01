@@ -145,7 +145,30 @@
       return this._fetch('/orders' + (q ? '?' + q : ''));
     },
     getOrder(orderId) {
-      return this._fetch('/orders/' + orderId);
+      return this._fetch('/orders/' + encodeURIComponent(orderId));
+    },
+
+    /* ---------- Admin: Order management ---------- */
+    adminUpdateOrderStatus(orderId, status) {
+      return this._fetch('/admin/orders/' + encodeURIComponent(orderId) + '/status', {
+        method: 'PATCH',
+        body: JSON.stringify({ status }),
+      });
+    },
+    adminUpdateOrderTracking(orderId, data) {
+      return this._fetch('/admin/orders/' + encodeURIComponent(orderId) + '/tracking', {
+        method: 'PATCH',
+        body: JSON.stringify(data),
+      });
+    },
+    adminRefundOrder(orderId, refundAmount) {
+      return this._fetch('/admin/orders/' + encodeURIComponent(orderId) + '/refund', {
+        method: 'POST',
+        body: JSON.stringify(refundAmount ? { refundAmount } : {}),
+      });
+    },
+    adminStats() {
+      return this._fetch('/admin/stats');
     },
   };
 
