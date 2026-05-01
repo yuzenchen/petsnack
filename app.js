@@ -59,6 +59,11 @@ document.addEventListener('keydown', function (e) {
   if (orderM && orderM.classList.contains('active')) {
     if (e.key === 'Escape') { e.preventDefault(); closeOrderModal(); return; }
   }
+  // 結帳 modal: Escape 關閉
+  const coM = document.getElementById('checkout-modal');
+  if (coM && coM.classList.contains('active')) {
+    if (e.key === 'Escape') { e.preventDefault(); closeCheckoutModal(); return; }
+  }
   // 登入 modal: Escape 關閉 + focus trap
   const m = document.getElementById('login-modal');
   if (!m || !m.classList.contains('active')) return;
@@ -595,55 +600,137 @@ function renderCart() {
     </div>`;
 }
 
+/**
+ * 點購物車「立即結帳」按鈕入口:
+ *   - dealer  -> 直接送出訂貨單 (用 dealer 表單,不走 LINE Pay)
+ *   - guest/general -> 開「填寫收件資訊 modal」,讓使用者輸入姓名/電話/地址
+ */
 async function checkout() {
-  const items = Object.entries(cart)
+  const items = collectCartItems();
+  if (!items.length) { showToast('購物車是空的', false); return; }
+
+  if (currentUser?.role === 'dealer') {
+    return submitDealerCheckout(items);
+  }
+  // 一般訂單 -> 開 modal
+  openCheckoutModal();
+}
+
+/* ---------- 共用:整理購物車 ---------- */
+function collectCartItems() {
+  return Object.entries(cart)
     .filter(([_, v]) => v.qty > 0)
     .map(([key, v]) => {
       const { refType, refId } = parseCartKey(key);
       return { refType, refId, qty: v.qty };
     });
-  if (!items.length) { showToast('購物車是空的', false); return; }
+}
 
-  const isDealer = currentUser?.role === 'dealer';
-  const payload = { items, orderType: isDealer ? 'dealer' : 'general' };
-  if (isDealer) {
-    payload.dealer = {
+/* ---------- 經銷下單 (沿用原邏輯) ---------- */
+async function submitDealerCheckout(items) {
+  const payload = {
+    items, orderType: 'dealer',
+    dealer: {
       shopName: document.getElementById('do-shop')?.value.trim() || currentUser.displayName,
       contact: document.getElementById('do-contact')?.value.trim() || '',
       phone: document.getElementById('do-phone')?.value.trim() || '',
       deliveryDate: document.getElementById('do-date')?.value.trim() || '',
       note: document.getElementById('do-note')?.value.trim() || '',
-    };
-    if (!payload.dealer.contact || !payload.dealer.phone) {
-      showToast('請先到「經銷專區」填寫聯絡人與電話', false);
-      switchPage('dealer');
-      return;
-    }
-  } else {
-    payload.customer = {};
+    },
+  };
+  if (!payload.dealer.contact || !payload.dealer.phone) {
+    showToast('請先到「經銷專區」填寫聯絡人與電話', false);
+    switchPage('dealer');
+    return;
   }
-
   const btn = document.querySelector('.checkout-btn');
   if (btn) { btn.disabled = true; btn.textContent = '處理中...'; }
+  try {
+    const result = await Api.checkout(payload);
+    showToast(`✓ 訂貨單已送出 (${result.orderId})`, true);
+    cart = {}; saveCart(); updateCartBadge(); renderCart();
+  } catch (e) {
+    showToast('結帳失敗: ' + e.message, false);
+    if (btn) { btn.disabled = false; btn.textContent = '送出訂貨單 →'; }
+  }
+}
+
+/* ---------- 結帳 Modal (一般訂單) ---------- */
+const CO_KEY = 'wama_customer';
+
+function openCheckoutModal() {
+  const modal = document.getElementById('checkout-modal');
+  if (!modal) return;
+
+  // 從 localStorage 帶回上次填的資料
+  let saved = {};
+  try { saved = JSON.parse(localStorage.getItem(CO_KEY) || '{}'); } catch (_) {}
+  document.getElementById('co-name').value = saved.name || '';
+  document.getElementById('co-phone').value = saved.phone || '';
+  document.getElementById('co-address').value = saved.address || '';
+  document.getElementById('co-email').value = saved.email || '';
+  document.getElementById('checkout-error').textContent = '';
+  const submitBtn = document.getElementById('co-submit');
+  if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = '確認結帳 →'; }
+
+  modal.classList.add('active');
+  modal.setAttribute('aria-hidden', 'false');
+  setTimeout(() => document.getElementById('co-name').focus(), 100);
+}
+
+function closeCheckoutModal() {
+  const m = document.getElementById('checkout-modal');
+  m.classList.remove('active');
+  m.setAttribute('aria-hidden', 'true');
+}
+
+async function confirmCheckout() {
+  const items = collectCartItems();
+  if (!items.length) { showToast('購物車是空的', false); closeCheckoutModal(); return; }
+
+  const name = document.getElementById('co-name').value.trim();
+  const phone = document.getElementById('co-phone').value.trim();
+  const address = document.getElementById('co-address').value.trim();
+  const email = document.getElementById('co-email').value.trim();
+  const errEl = document.getElementById('checkout-error');
+
+  // 客端驗證
+  if (!name) { errEl.textContent = '⚠ 請輸入姓名'; document.getElementById('co-name').focus(); return; }
+  if (!phone) { errEl.textContent = '⚠ 請輸入電話'; document.getElementById('co-phone').focus(); return; }
+  if (!address) { errEl.textContent = '⚠ 請輸入收件地址'; document.getElementById('co-address').focus(); return; }
+  if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    errEl.textContent = '⚠ Email 格式不正確'; document.getElementById('co-email').focus(); return;
+  }
+  errEl.textContent = '';
+
+  // 儲存到 localStorage 方便下次帶回
+  try { localStorage.setItem(CO_KEY, JSON.stringify({ name, phone, address, email })); } catch (_) {}
+
+  const payload = {
+    items,
+    orderType: 'general',
+    customer: { name, phone, ...(email ? { email } : {}) },
+    shippingMethod: 'home_delivery',
+    shippingInfo: { address },
+  };
+
+  const submitBtn = document.getElementById('co-submit');
+  if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = '處理中...'; }
 
   try {
     const result = await Api.checkout(payload);
-    if (result.requirePayment === false) {
-      showToast(`✓ 訂貨單已送出 (${result.orderId})`, true);
-      cart = {};
-      saveCart();
-      updateCartBadge();
-      renderCart();
-    } else if (result.paymentUrl) {
+    if (result.paymentUrl) {
       showToast('正在跳轉到 LINE Pay...', true);
+      closeCheckoutModal();
       setTimeout(() => { window.location.href = result.paymentUrl; }, 600);
     } else {
-      showToast('訂單已建立', true);
+      showToast(`✓ 訂單已建立 (${result.orderId})`, true);
+      closeCheckoutModal();
+      cart = {}; saveCart(); updateCartBadge(); renderCart();
     }
   } catch (e) {
-    showToast('結帳失敗: ' + e.message, false);
-    console.error(e);
-    if (btn) { btn.disabled = false; btn.textContent = isDealer ? '送出訂貨單 →' : '立即結帳 →'; }
+    errEl.textContent = '⚠ ' + (e.message || '結帳失敗');
+    if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = '確認結帳 →'; }
   }
 }
 

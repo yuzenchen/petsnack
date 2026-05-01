@@ -373,6 +373,37 @@
   <button class="bnav-btn admin-only" id="bnav-admin" onclick="switchPage('admin')"><span class="bnav-icon" aria-hidden="true">⚙️</span>後台</button>
 </nav>
 
+<!-- CHECKOUT INFO MODAL -->
+<div class="modal-overlay" id="checkout-modal" role="dialog" aria-modal="true" aria-labelledby="checkout-modal-title" aria-hidden="true">
+  <div class="modal">
+    <button class="modal-close" onclick="closeCheckoutModal()" aria-label="關閉結帳視窗">×</button>
+    <div class="modal-icon" aria-hidden="true">📝</div>
+    <h3 id="checkout-modal-title">填寫訂購資訊</h3>
+    <p class="modal-sub">請填寫收件資料,完成後將跳轉至 LINE Pay</p>
+    <div class="modal-field">
+      <label for="co-name">姓名 <span style="color:var(--sale)">*</span></label>
+      <input type="text" id="co-name" autocomplete="name" placeholder="王小明" required>
+    </div>
+    <div class="modal-field">
+      <label for="co-phone">聯絡電話 <span style="color:var(--sale)">*</span></label>
+      <input type="tel" id="co-phone" autocomplete="tel" placeholder="0912-345-678" required>
+    </div>
+    <div class="modal-field">
+      <label for="co-address">收件地址 <span style="color:var(--sale)">*</span></label>
+      <input type="text" id="co-address" autocomplete="street-address" placeholder="台北市中山區中山北路二段 1 號" required>
+    </div>
+    <div class="modal-field">
+      <label for="co-email">Email <span style="color:var(--text-light);font-weight:500">(選填,訂單通知)</span></label>
+      <input type="email" id="co-email" autocomplete="email" placeholder="you@example.com">
+    </div>
+    <div id="checkout-error" role="alert" aria-live="assertive" style="min-height:20px;color:var(--red);font-size:12px;font-weight:700;margin-bottom:8px"></div>
+    <div class="modal-actions">
+      <button class="modal-btn primary" id="co-submit" onclick="confirmCheckout()">確認結帳 →</button>
+      <button class="modal-btn outline" onclick="closeCheckoutModal()">返回購物車</button>
+    </div>
+  </div>
+</div>
+
 <!-- ORDER DETAIL MODAL -->
 <div class="modal-overlay" id="order-modal" role="dialog" aria-modal="true" aria-labelledby="order-modal-title" aria-hidden="true">
   <div class="modal order-modal">
