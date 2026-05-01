@@ -54,6 +54,16 @@ function closeLoginModal() {
 }
 
 document.addEventListener('keydown', function (e) {
+  // 商品詳情 modal: Escape 關閉
+  const prodM = document.getElementById('product-modal');
+  if (prodM && prodM.classList.contains('active')) {
+    if (e.key === 'Escape') { e.preventDefault(); closeProductModal(); return; }
+  }
+  // 訂單確認 modal: Escape 關閉
+  const ocM = document.getElementById('order-confirm-modal');
+  if (ocM && ocM.classList.contains('active')) {
+    if (e.key === 'Escape') { e.preventDefault(); closeOrderConfirmModal(); return; }
+  }
   // 訂單 modal: Escape 關閉
   const orderM = document.getElementById('order-modal');
   if (orderM && orderM.classList.contains('active')) {
@@ -176,9 +186,10 @@ function _normalizeProduct(p) {
     price: p.price, orig: p.orig, badge: p.badge, type: p.type,
     stock: p.stock, lowStockThreshold: p.lowStockThreshold,
     trackStock: p.trackStock, stockStatus: p.stockStatus,
+    imageUrl: p.imageUrl || '', description: p.description || '',
   };
 }
-function _normalizeBundle(b)  { return { id: b.bundleId, name: b.name, tag: b.tag, items: b.items, disc: b.disc, visibility: b.visibility, active: b.active }; }
+function _normalizeBundle(b)  { return { id: b.bundleId, name: b.name, tag: b.tag, items: b.items, disc: b.disc, visibility: b.visibility, active: b.active, imageUrl: b.imageUrl || '', description: b.description || '' }; }
 function _normalizeAddon(a) {
   return {
     id: a.addonId, name: a.name, emoji: a.emoji,
@@ -208,6 +219,14 @@ function stockBadgeHtml(stockOrItem, lowThreshold = 5, trackStock = true) {
   if (stock <= 0) return '<span class="stock-badge out">缺貨</span>';
   if (stock <= lowThreshold) return `<span class="stock-badge low">僅剩 ${stock} 件</span>`;
   return '<span class="stock-badge ok">有現貨</span>';
+}
+
+/* 商品圖片 / emoji 顯示（有 imageUrl 時顯示 img，否則顯示 emoji） */
+function productMediaHtml(item) {
+  if (item.imageUrl) {
+    return `<div class="product-img" data-emoji="${item.emoji || ''}" aria-hidden="true"><img src="${item.imageUrl}" alt="${item.name}" class="prod-real-img" onerror="this.parentNode.innerHTML=this.parentNode.dataset.emoji"></div>`;
+  }
+  return `<div class="product-img" aria-hidden="true">${item.emoji || ''}</div>`;
 }
 
 async function reloadCatalog() {
@@ -276,9 +295,9 @@ function renderProducts() {
     const isOut = tracked && (p.stock ?? 0) <= 0;
     const badge = stockBadgeHtml(p.stock, p.lowStockThreshold ?? 5, p.trackStock);
     return `
-    <article class="product-card${isOut ? ' is-out' : ''}">
+    <article class="product-card${isOut ? ' is-out' : ''}" onclick="openProductModal('prod',${p.id})" style="cursor:pointer" tabindex="0" onkeydown="if(event.key==='Enter')openProductModal('prod',${p.id})">
       ${p.badge ? `<span class="product-badge ${p.badge}">${lbl[p.badge]}</span>` : ''}
-      <div class="product-img" aria-hidden="true">${p.emoji}</div>
+      ${productMediaHtml(p)}
       <div class="product-info">
         <h5>${p.name}</h5>
         <div class="product-sub">${p.sub || ''}</div>
@@ -288,7 +307,7 @@ function renderProducts() {
         </div>
         ${badge}
       </div>
-      <button class="add-cart-btn" ${isOut ? 'disabled aria-disabled="true"' : ''} onclick="addToCart('prod_${p.id}','${p.emoji} ${p.name}','單品',${p.price},this)">${isOut ? '缺貨中' : '加入購物車'}</button>
+      <button class="add-cart-btn" ${isOut ? 'disabled aria-disabled="true"' : ''} onclick="event.stopPropagation();addToCart('prod_${p.id}','${p.emoji} ${p.name}','單品',${p.price},this)">${isOut ? '缺貨中' : '加入購物車'}</button>
     </article>`;
   }).join('');
 }
@@ -313,6 +332,111 @@ function renderBundleDealer() {
   el.innerHTML = list.map(b => renderBundleCard(b, true)).join('');
 }
 
+/* ============================================================
+   PRODUCT DETAIL MODAL (項目 1)
+   ============================================================ */
+const PET_LABEL = { dog: '🐶 狗狗', cat: '🐱 貓咪', both: '🌟 通用' };
+const BADGE_LABEL = { new: '新品', hot: '熱賣', sale: '優惠' };
+
+function openProductModal(itemType, id) {
+  const modal = document.getElementById('product-modal');
+  const body = document.getElementById('product-modal-body');
+  if (!modal || !body) return;
+
+  let html = '';
+
+  if (itemType === 'prod') {
+    const p = ALL_PRODUCTS.find(x => String(x.id) === String(id));
+    if (!p) return;
+    const tracked = p.trackStock !== false;
+    const isOut = tracked && (p.stock ?? 0) <= 0;
+    const badge = stockBadgeHtml(p.stock, p.lowStockThreshold ?? 5, p.trackStock);
+    const imgContent = p.imageUrl
+      ? `<div class="pmd-img-wrap" data-emoji="${p.emoji}" aria-hidden="true"><img src="${p.imageUrl}" alt="${p.name}" class="prod-real-img" onerror="this.parentNode.innerHTML=this.parentNode.dataset.emoji"></div>`
+      : `<div class="pmd-img-wrap" aria-hidden="true"><div class="product-modal-emoji">${p.emoji}</div></div>`;
+    html = `
+      <div class="pmd-layout">
+        ${imgContent}
+        <div class="pmd-info">
+          <h3 id="product-modal-title">${p.name}</h3>
+          ${p.sub ? `<p class="pmd-sub">${p.sub}</p>` : ''}
+          <div class="pmd-price-wrap">
+            <span class="price-sale">NT$ ${p.price}</span>
+            ${p.orig ? `<span class="price-regular">NT$ ${p.orig}</span>` : ''}
+          </div>
+          ${p.description ? `<p class="pmd-desc">${p.description}</p>` : ''}
+          <div class="pmd-tags">
+            ${p.type ? `<span class="pmd-tag">${PET_LABEL[p.type] || p.type}</span>` : ''}
+            ${p.badge ? `<span class="pmd-tag ${p.badge}">${BADGE_LABEL[p.badge] || p.badge}</span>` : ''}
+          </div>
+          ${badge}
+          <button class="modal-btn primary pmd-cart-btn" ${isOut ? 'disabled' : ''} onclick="addToCart('prod_${p.id}','${p.emoji} ${p.name}','單品',${p.price},this);closeProductModal()">
+            ${isOut ? '⚠ 缺貨中' : '🛒 加入購物車'}
+          </button>
+        </div>
+      </div>`;
+
+  } else if (itemType === 'bundle') {
+    const b = BUNDLES.find(x => String(x.id) === String(id));
+    if (!b) return;
+    const orig = bundleOrig(b), final = bundleFinal(b), save = orig - final;
+    const items = b.items.map(getProduct).filter(Boolean);
+    const emojis = items.map(p => p.emoji).join('');
+    const key = 'bundle_' + b.id;
+    const bType = b.visibility === 'dealer' ? '經銷組合包' : '組合包';
+    const avail = bundleAvailableStock(b);
+    const isOut = avail <= 0;
+    const badge = stockBadgeHtml(avail, 5);
+    const imgContent = b.imageUrl
+      ? `<div class="pmd-img-wrap" data-emoji="${emojis}" aria-hidden="true"><img src="${b.imageUrl}" alt="${b.name}" class="prod-real-img" onerror="this.parentNode.innerHTML=this.parentNode.dataset.emoji"></div>`
+      : `<div class="pmd-img-wrap" aria-hidden="true"><div class="product-modal-emoji bundle-modal-emoji">${emojis}</div></div>`;
+    html = `
+      <div class="pmd-layout">
+        ${imgContent}
+        <div class="pmd-info">
+          <h3 id="product-modal-title">${b.name}</h3>
+          ${b.tag ? `<p class="pmd-sub">${b.tag}</p>` : ''}
+          <div class="pmd-price-wrap">
+            <span class="bundle-ribbon-inline">${b.disc}% OFF</span>
+            <span class="price-sale">NT$ ${final}</span>
+            <span class="price-regular">NT$ ${orig}</span>
+          </div>
+          ${b.description ? `<p class="pmd-desc">${b.description}</p>` : ''}
+          <div class="pmd-bundle-items">
+            <div class="pmd-items-label">包含商品</div>
+            ${items.map(p => `
+              <div class="pmd-bundle-item">
+                <span class="pmd-item-emoji">${p.emoji}</span>
+                <span class="pmd-item-name">${p.name}</span>
+                <span class="pmd-item-price">NT$${p.price}</span>
+              </div>`).join('')}
+          </div>
+          <span class="bundle-save">組合立省 NT$${save}</span>
+          ${badge}
+          <button class="modal-btn primary pmd-cart-btn" ${isOut ? 'disabled' : ''} onclick="addToCart('${key}','${emojis} ${b.name}','${bType}',${final},this);closeProductModal()">
+            ${isOut ? '⚠ 缺貨中' : '🛒 加入購物車'}
+          </button>
+        </div>
+      </div>`;
+  }
+
+  body.innerHTML = html;
+  _lastFocusedBeforeModal = document.activeElement;
+  modal.classList.add('active');
+  modal.setAttribute('aria-hidden', 'false');
+  setTimeout(() => modal.querySelector('.modal-close')?.focus(), 100);
+}
+
+function closeProductModal() {
+  const m = document.getElementById('product-modal');
+  if (!m) return;
+  m.classList.remove('active');
+  m.setAttribute('aria-hidden', 'true');
+  if (_lastFocusedBeforeModal) {
+    try { _lastFocusedBeforeModal.focus(); } catch (_) {}
+  }
+}
+
 function renderBundleCard(b, isDealer) {
   const orig = bundleOrig(b), final = bundleFinal(b), save = orig - final;
   const items = b.items.map(getProduct).filter(Boolean);
@@ -323,11 +447,14 @@ function renderBundleCard(b, isDealer) {
   const avail = bundleAvailableStock(b);
   const isOut = avail <= 0;
   const badge = stockBadgeHtml(avail, 5);
+  const bundleImgHtml = b.imageUrl
+    ? `<div class="product-img" data-emoji="${emojis}" aria-hidden="true"><img src="${b.imageUrl}" alt="${b.name}" class="prod-real-img" onerror="this.parentNode.innerHTML=this.parentNode.dataset.emoji"></div>`
+    : `<div class="product-img" aria-hidden="true"><span class="bundle-emojis-row">${emojis}</span></div>`;
   return `
-    <article class="product-card bundle-card ${isDealer ? 'dealer' : ''}${isOut ? ' is-out' : ''}">
+    <article class="product-card bundle-card ${isDealer ? 'dealer' : ''}${isOut ? ' is-out' : ''}" onclick="openProductModal('bundle',${b.id})" style="cursor:pointer" tabindex="0" onkeydown="if(event.key==='Enter')openProductModal('bundle',${b.id})">
       ${isDealer ? '<span class="bundle-vip-tag">VIP</span>' : ''}
       <span class="bundle-ribbon">${b.disc}% OFF</span>
-      <div class="product-img" aria-hidden="true"><span class="bundle-emojis-row">${emojis}</span></div>
+      ${bundleImgHtml}
       <div class="product-info">
         <h5>${b.name}</h5>
         <div class="product-sub">${b.tag || ''}</div>
@@ -339,7 +466,7 @@ function renderBundleCard(b, isDealer) {
         <span class="bundle-save">省 NT$${save}</span>
         ${badge}
       </div>
-      <button class="add-cart-btn" ${isOut ? 'disabled aria-disabled="true"' : ''} onclick="addToCart('${key}','${emojis} ${b.name}','${type}',${final},this)">${isOut ? '缺貨中' : '加入購物車'}</button>
+      <button class="add-cart-btn" ${isOut ? 'disabled aria-disabled="true"' : ''} onclick="event.stopPropagation();addToCart('${key}','${emojis} ${b.name}','${type}',${final},this)">${isOut ? '缺貨中' : '加入購物車'}</button>
     </article>`;
 }
 
@@ -599,6 +726,16 @@ function renderCart() {
         <h3>購物車是空的</h3>
         <p>快去選購毛孩最愛的零食吧！</p>
         <button class="back-shop-btn" onclick="switchPage('shop')">去逛逛 →</button>
+      </div>
+      <div class="order-lookup-section">
+        <h4>🔍 查詢訂單</h4>
+        <p>輸入訂單編號查看您的訂單狀態</p>
+        <div class="order-lookup-row">
+          <input type="text" id="order-lookup-input" placeholder="請輸入訂單編號" maxlength="64"
+                 onkeypress="if(event.key==='Enter')lookupOrder()">
+          <button class="pill-btn green" onclick="lookupOrder()">查詢</button>
+        </div>
+        <div id="order-lookup-error" role="alert" style="min-height:18px;font-size:12px;color:var(--red);margin-top:6px;font-weight:700"></div>
       </div>`;
     return;
   }
@@ -845,6 +982,101 @@ function addAddon(addonId, btn) {
   updateCartBadge();
   renderCart();
   showToast(`✓ 已加購「${a.name}」省 NT$${a.orig - a.special}！`, true);
+}
+
+/* ============================================================
+   ORDER CONFIRM MODAL (項目 5)
+   ============================================================ */
+const ORDER_STATUS_ZH = {
+  created: '建立中', paid: '已付款', processing: '備貨中',
+  shipped: '已出貨', delivered: '已送達', cancelled: '已取消',
+};
+
+function lookupOrder() {
+  const input = document.getElementById('order-lookup-input');
+  const errEl = document.getElementById('order-lookup-error');
+  if (!input) return;
+  const orderId = input.value.trim();
+  if (!orderId) { if (errEl) errEl.textContent = '⚠ 請輸入訂單編號'; return; }
+  if (errEl) errEl.textContent = '';
+  openOrderConfirmModal(orderId, true);
+}
+
+async function openOrderConfirmModal(orderId, isLookup) {
+  const modal = document.getElementById('order-confirm-modal');
+  const body = document.getElementById('order-confirm-body');
+  if (!modal || !body) return;
+  modal.classList.add('active');
+  modal.setAttribute('aria-hidden', 'false');
+  body.innerHTML = '<p class="modal-sub" style="padding:30px 0;text-align:center">載入訂單資料中…</p>';
+  try {
+    const { order } = await Api.getOrder(orderId);
+    body.innerHTML = renderOrderConfirmContent(order, isLookup);
+  } catch (e) {
+    if (isLookup) {
+      body.innerHTML = `
+        <div style="text-align:center;padding:20px 0">
+          <div style="font-size:42px;margin-bottom:12px">🔍</div>
+          <p style="font-weight:700;color:var(--red);margin-bottom:8px">找不到訂單</p>
+          <p class="modal-sub">${e.message || '請確認訂單編號是否正確'}</p>
+          <button class="modal-btn outline" style="margin-top:14px;max-width:200px" onclick="closeOrderConfirmModal()">關閉</button>
+        </div>`;
+    } else {
+      body.innerHTML = `
+        <div style="text-align:center;padding:20px 0">
+          <div style="font-size:48px;margin-bottom:10px">✅</div>
+          <h3 style="font-family:'Playfair Display',serif;margin-bottom:6px">感謝您的訂購！</h3>
+          <p class="modal-sub">訂單編號：${orderId}</p>
+          <button class="modal-btn primary" style="margin-top:16px" onclick="closeOrderConfirmModal();switchPage('shop')">繼續購物 →</button>
+        </div>`;
+    }
+  }
+}
+
+function closeOrderConfirmModal() {
+  const m = document.getElementById('order-confirm-modal');
+  if (!m) return;
+  m.classList.remove('active');
+  m.setAttribute('aria-hidden', 'true');
+}
+
+function renderOrderConfirmContent(o, isLookup) {
+  const statusZh = ORDER_STATUS_ZH[o.status] || o.status;
+  const statusCls = STATUS_CLASS[o.status] || 's-pend';
+  const items = (o.items || []).map(i => `
+    <div class="occ-item">
+      <span class="occ-item-name">${i.name || '-'}</span>
+      <span class="occ-item-qty">×${i.qty}</span>
+      <span class="occ-item-price">NT$${((i.price || 0) * i.qty).toLocaleString()}</span>
+    </div>`).join('');
+  const header = isLookup
+    ? `<div class="occ-header">
+         <div class="occ-icon">🔍</div>
+         <h3 id="order-confirm-title">訂單查詢結果</h3>
+         <p class="modal-sub">狀態：<span class="order-status ${statusCls}">${statusZh}</span></p>
+       </div>`
+    : `<div class="occ-header">
+         <div class="occ-icon">✅</div>
+         <h3 id="order-confirm-title">感謝您的訂購！</h3>
+       </div>`;
+  return `
+    ${header}
+    <div class="occ-order-no">訂單編號：<code>${o.orderId}</code></div>
+    ${items ? `<div class="occ-items-section">
+      <div class="occ-section-label">訂購品項</div>
+      ${items}
+    </div>` : ''}
+    <div class="occ-totals">
+      <div class="occ-total-row"><span>商品小計</span><span>NT$${(o.subtotal || 0).toLocaleString()}</span></div>
+      <div class="occ-total-row"><span>運費</span><span>NT$${(o.shipping || 0).toLocaleString()}</span></div>
+      <div class="occ-total-row grand"><span>總金額</span><span>NT$${(o.totalAmount || 0).toLocaleString()}</span></div>
+    </div>
+    ${(o.customer?.name || o.shippingInfo?.address) ? `<div class="occ-shipping">
+      <div class="occ-section-label">收件資訊</div>
+      ${o.customer?.name ? `<div class="occ-addr-row">👤 ${o.customer.name}</div>` : ''}
+      ${o.shippingInfo?.address ? `<div class="occ-addr-row">📍 ${o.shippingInfo.address}</div>` : ''}
+    </div>` : ''}
+    <button class="modal-btn primary" onclick="closeOrderConfirmModal();switchPage('shop')">繼續購物 →</button>`;
 }
 
 /* ============================ CONFIRM MODAL ============================ */
@@ -1316,12 +1548,16 @@ function handlePaymentRedirect() {
   const msg = params.get('msg');
   setTimeout(() => {
     if (status === 'success') {
-      showToast(`✓ 訂單 ${orderId || ''} 付款成功!`, true);
       cart = {};
       saveCart();
       updateCartBadge();
       renderCart();
-      switchPage('cart');
+      if (orderId) {
+        openOrderConfirmModal(orderId, false);
+      } else {
+        switchPage('cart');
+        showToast('✓ 付款成功！感謝您的訂購', true);
+      }
     } else if (status === 'cancelled') {
       showToast('已取消付款', false);
     } else if (status === 'error') {

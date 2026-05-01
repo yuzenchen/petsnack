@@ -460,6 +460,22 @@
   </div>
 </div>
 
+<!-- PRODUCT DETAIL MODAL -->
+<div class="modal-overlay" id="product-modal" role="dialog" aria-modal="true" aria-labelledby="product-modal-title" aria-hidden="true">
+  <div class="modal product-detail-modal">
+    <button class="modal-close" onclick="closeProductModal()" aria-label="關閉商品詳情">×</button>
+    <div id="product-modal-body"></div>
+  </div>
+</div>
+
+<!-- ORDER CONFIRM MODAL -->
+<div class="modal-overlay" id="order-confirm-modal" role="dialog" aria-modal="true" aria-labelledby="order-confirm-title" aria-hidden="true">
+  <div class="modal order-confirm-modal">
+    <button class="modal-close" onclick="closeOrderConfirmModal()" aria-label="關閉訂單資訊">×</button>
+    <div id="order-confirm-body"></div>
+  </div>
+</div>
+
 <!-- TOAST -->
 <div class="toast" id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
 
