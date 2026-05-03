@@ -93,6 +93,10 @@
       <button id="nav-link-dealer" class="dealer-only" role="tab" aria-selected="false" onclick="switchPage('dealer')">經銷專區</button>
       <button id="nav-link-admin" class="admin-only" role="tab" aria-selected="false" onclick="switchPage('admin')">後台管理</button>
     </nav>
+    <div class="search-bar">
+      <input type="search" id="product-search" class="search-input" placeholder="搜尋商品..." oninput="handleProductSearch()" maxlength="50" aria-label="搜尋商品">
+      <button class="search-clear-btn" id="search-clear-btn" onclick="clearProductSearch()" style="display:none" aria-label="清除搜尋">✕</button>
+    </div>
     <div class="header-icons">
       <button class="role-pill" id="role-pill" onclick="openLoginModal()" aria-label="登入帳號">
         <span id="role-icon" aria-hidden="true">👤</span>
@@ -427,10 +431,26 @@
 <!-- 手機底部導覽 -->
 <nav class="bottom-nav" aria-label="底部導覽">
   <button class="bnav-btn active" id="bnav-shop" onclick="switchPage('shop')"><span class="bnav-icon" aria-hidden="true">🏪</span>商店</button>
+  <button class="bnav-btn" id="bnav-search" onclick="openSearchOverlay()" style="display:none"><span class="bnav-icon" aria-hidden="true">🔍</span>搜尋</button>
   <button class="bnav-btn dealer-only" id="bnav-dealer" onclick="switchPage('dealer')"><span class="bnav-icon" aria-hidden="true">💼</span>經銷</button>
   <button class="bnav-btn" id="bnav-cart" onclick="switchPage('cart')"><span class="bnav-icon" aria-hidden="true">🛒</span>購物車<span class="bnav-badge" id="bnav-badge" style="display:none">0</span></button>
   <button class="bnav-btn admin-only" id="bnav-admin" onclick="switchPage('admin')"><span class="bnav-icon" aria-hidden="true">⚙️</span>後台</button>
 </nav>
+
+<!-- 全螢幕搜尋 Overlay (手機版) -->
+<div class="search-overlay" id="search-overlay" role="dialog" aria-modal="true" aria-labelledby="search-overlay-title" aria-hidden="true">
+  <div class="search-overlay-content">
+    <div class="search-overlay-header">
+      <h2 id="search-overlay-title">搜尋商品</h2>
+      <button class="search-overlay-close" onclick="closeSearchOverlay()" aria-label="關閉搜尋">✕</button>
+    </div>
+    <div class="search-overlay-input-wrap">
+      <input type="search" id="mobile-product-search" class="search-overlay-input" placeholder="搜尋商品名稱..." oninput="handleMobileSearch()" maxlength="50" aria-label="搜尋商品">
+      <button class="search-overlay-clear" id="mobile-search-clear" onclick="clearMobileSearch()" style="display:none" aria-label="清除搜尋">✕</button>
+    </div>
+    <div id="search-results-container" class="search-results-container"></div>
+  </div>
+</div>
 
 <!-- CHECKOUT INFO MODAL -->
 <div class="modal-overlay" id="checkout-modal" role="dialog" aria-modal="true" aria-labelledby="checkout-modal-title" aria-hidden="true">
