@@ -474,8 +474,28 @@
       <input type="tel" id="co-phone" autocomplete="tel" placeholder="0912-345-678" required>
     </div>
     <div class="modal-field">
+      <label>配送方式 <span style="color:var(--sale)">*</span></label>
+      <div class="shipping-toggle" role="radiogroup" aria-label="配送方式">
+        <button type="button" class="ship-opt active" data-method="home_delivery"
+                role="radio" aria-checked="true" onclick="setShippingMethod('home_delivery')">
+          🚚 宅配到府
+        </button>
+        <button type="button" class="ship-opt" data-method="convenience_store"
+                role="radio" aria-checked="false" onclick="setShippingMethod('convenience_store')">
+          🏪 7-11 取貨
+        </button>
+      </div>
+    </div>
+    <div class="modal-field" id="co-address-field">
       <label for="co-address">收件地址 <span style="color:var(--sale)">*</span></label>
-      <input type="text" id="co-address" autocomplete="street-address" placeholder="台北市中山區中山北路二段 1 號" required>
+      <input type="text" id="co-address" autocomplete="street-address" placeholder="台北市中山區中山北路二段 1 號">
+    </div>
+    <div class="modal-field" id="co-cvstore-field" style="display:none">
+      <label>取貨門市 <span style="color:var(--sale)">*</span></label>
+      <div id="co-cvstore-display" class="cvstore-display">尚未選擇門市</div>
+      <button type="button" class="btn-outline cvstore-pick-btn" onclick="openEcpayMapPicker()">
+        選擇 7-11 門市 →
+      </button>
     </div>
     <div class="modal-field">
       <label for="co-email">Email <span style="color:var(--text-light);font-weight:500">(選填,訂單通知)</span></label>

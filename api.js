@@ -99,6 +99,11 @@
       });
     },
 
+    /* ---------- ECPay 物流選店 ---------- */
+    ecpayMapForm(mobile = false) {
+      return this._fetch('/logistics/ecpay/map-form' + (mobile ? '?mobile=1' : ''));
+    },
+
     /* ---------- Admin: Bundles ---------- */
     adminListBundles() {
       return this._fetch('/admin/bundles');

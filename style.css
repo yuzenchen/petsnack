@@ -106,6 +106,26 @@ body.role-admin .nav-links button.dealer-only,
 body.role-admin .nav-links button.admin-only{display:inline-block}
 
 /* ============================
+   SHIPPING METHOD TOGGLE (checkout modal)
+   ============================ */
+.shipping-toggle{display:flex;gap:8px;margin-top:6px}
+.ship-opt{
+  flex:1;padding:10px 12px;border:1.5px solid var(--border);background:var(--white);
+  color:var(--text);font-size:13px;font-weight:600;border-radius:8px;
+  cursor:pointer;transition:all .2s;
+}
+.ship-opt:hover{border-color:var(--primary-light);background:var(--bg)}
+.ship-opt.active{border-color:var(--primary);background:var(--primary-light);color:var(--primary-dark)}
+.cvstore-display{
+  padding:10px 12px;background:var(--bg);border-radius:8px;
+  font-size:13px;color:var(--text);margin-bottom:8px;border:1px dashed var(--border);
+}
+.cvstore-display.selected{
+  background:var(--gr-light);border-style:solid;border-color:var(--gr);color:var(--text);
+}
+.cvstore-pick-btn{width:100%;padding:10px;font-size:13px}
+
+/* ============================
    SEARCH BAR + 搜尋模式
    ============================ */
 .search-bar{display:none;align-items:center;gap:6px;flex:0 1 280px}

@@ -1170,6 +1170,16 @@ function openCheckoutModal() {
   const submitBtn = document.getElementById('co-submit');
   if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = '確認結帳 →'; }
 
+  // 預設配送方式 = 宅配 (除非剛從選店 callback 回來,handleCvStoreReturn 會在 modal 開好後 override)
+  setShippingMethod(_selectedCvStore ? 'convenience_store' : 'home_delivery');
+  if (!_selectedCvStore) {
+    const display = document.getElementById('co-cvstore-display');
+    if (display) {
+      display.classList.remove('selected');
+      display.textContent = '尚未選擇門市';
+    }
+  }
+
   modal.classList.add('active');
   modal.setAttribute('aria-hidden', 'false');
   setTimeout(() => document.getElementById('co-name').focus(), 100);
@@ -1181,6 +1191,108 @@ function closeCheckoutModal() {
   m.setAttribute('aria-hidden', 'true');
 }
 
+/* ============================ SHIPPING METHOD ============================ */
+let _checkoutShippingMethod = 'home_delivery';
+let _selectedCvStore = null;  // { cvStoreId, cvStoreName, cvAddress }
+
+function setShippingMethod(method) {
+  _checkoutShippingMethod = method;
+  document.querySelectorAll('.ship-opt').forEach(b => {
+    const on = b.dataset.method === method;
+    b.classList.toggle('active', on);
+    b.setAttribute('aria-checked', on ? 'true' : 'false');
+  });
+  const addrField = document.getElementById('co-address-field');
+  const cvField = document.getElementById('co-cvstore-field');
+  if (addrField) addrField.style.display = method === 'home_delivery' ? 'block' : 'none';
+  if (cvField) cvField.style.display = method === 'convenience_store' ? 'block' : 'none';
+}
+
+async function openEcpayMapPicker() {
+  // 暫存 checkout 草稿,選店回來後恢復
+  _saveCheckoutDraft();
+  try {
+    const isMobile = window.matchMedia('(max-width: 899px)').matches;
+    const resp = await Api.ecpayMapForm(isMobile);
+    // 動態建立 form 並 submit 到 ECPay
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = resp.action;
+    form.style.display = 'none';
+    Object.entries(resp.fields).forEach(([k, v]) => {
+      const input = document.createElement('input');
+      input.type = 'hidden';
+      input.name = k;
+      input.value = v;
+      form.appendChild(input);
+    });
+    document.body.appendChild(form);
+    form.submit();
+  } catch (e) {
+    showToast('無法開啟選店頁面: ' + (e.message || ''), false);
+  }
+}
+
+const CHECKOUT_DRAFT_KEY = 'wama_checkout_draft';
+function _saveCheckoutDraft() {
+  const draft = {
+    name: document.getElementById('co-name')?.value || '',
+    phone: document.getElementById('co-phone')?.value || '',
+    email: document.getElementById('co-email')?.value || '',
+    cart,
+  };
+  try { sessionStorage.setItem(CHECKOUT_DRAFT_KEY, JSON.stringify(draft)); } catch (_) {}
+}
+function _loadCheckoutDraft() {
+  try {
+    const s = sessionStorage.getItem(CHECKOUT_DRAFT_KEY);
+    if (!s) return null;
+    sessionStorage.removeItem(CHECKOUT_DRAFT_KEY);
+    return JSON.parse(s);
+  } catch (_) { return null; }
+}
+
+/* 偵測 ECPay 選店 callback redirect 回來 (URL 帶 cvStoreId, hash=#/cv-store) */
+function handleCvStoreReturn() {
+  const params = new URLSearchParams(location.search);
+  const cvStoreId = params.get('cvStoreId');
+  const cvStoreName = params.get('cvStoreName');
+  if (!cvStoreId || !location.hash.startsWith('#/cv-store')) return false;
+
+  _selectedCvStore = {
+    cvStoreId,
+    cvStoreName: cvStoreName || '',
+    cvAddress: params.get('cvAddress') || '',
+  };
+  // 清掉 URL,避免 reload 重入
+  history.replaceState(null, '', location.pathname);
+
+  // 恢復購物車草稿
+  const draft = _loadCheckoutDraft();
+  if (draft?.cart) { cart = draft.cart; saveCart(); updateCartBadge(); }
+
+  // 開啟 checkout modal,預填欄位 + 切到 7-11 取貨
+  switchPage('cart');
+  setTimeout(() => {
+    openCheckoutModal();
+    setShippingMethod('convenience_store');
+    if (draft) {
+      const setVal = (id, v) => { const el = document.getElementById(id); if (el && v) el.value = v; };
+      setVal('co-name', draft.name);
+      setVal('co-phone', draft.phone);
+      setVal('co-email', draft.email);
+    }
+    const display = document.getElementById('co-cvstore-display');
+    if (display) {
+      display.classList.add('selected');
+      display.innerHTML = `<strong>✓ ${escHtml(_selectedCvStore.cvStoreName || '已選擇門市')}</strong>` +
+        `<div style="font-size:11px;color:var(--text-light);margin-top:2px">店號: ${escHtml(cvStoreId)}` +
+        (_selectedCvStore.cvAddress ? ` · ${escHtml(_selectedCvStore.cvAddress)}` : '') + `</div>`;
+    }
+  }, 200);
+  return true;
+}
+
 async function confirmCheckout() {
   const items = collectCartItems();
   if (!items.length) { showToast('購物車是空的', false); closeCheckoutModal(); return; }
@@ -1190,11 +1302,18 @@ async function confirmCheckout() {
   const address = document.getElementById('co-address').value.trim();
   const email = document.getElementById('co-email').value.trim();
   const errEl = document.getElementById('checkout-error');
+  const isCvs = _checkoutShippingMethod === 'convenience_store';
 
   // 客端驗證
   if (!name) { errEl.textContent = '⚠ 請輸入姓名'; document.getElementById('co-name').focus(); return; }
   if (!phone) { errEl.textContent = '⚠ 請輸入電話'; document.getElementById('co-phone').focus(); return; }
-  if (!address) { errEl.textContent = '⚠ 請輸入收件地址'; document.getElementById('co-address').focus(); return; }
+  if (isCvs) {
+    if (!_selectedCvStore?.cvStoreId) {
+      errEl.textContent = '⚠ 請選擇 7-11 取貨門市'; return;
+    }
+  } else {
+    if (!address) { errEl.textContent = '⚠ 請輸入收件地址'; document.getElementById('co-address').focus(); return; }
+  }
   if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     errEl.textContent = '⚠ Email 格式不正確'; document.getElementById('co-email').focus(); return;
   }
@@ -1207,8 +1326,10 @@ async function confirmCheckout() {
     items,
     orderType: 'general',
     customer: { name, phone, ...(email ? { email } : {}) },
-    shippingMethod: 'home_delivery',
-    shippingInfo: { address },
+    shippingMethod: _checkoutShippingMethod,
+    shippingInfo: isCvs
+      ? { cvStoreId: _selectedCvStore.cvStoreId, cvStoreName: _selectedCvStore.cvStoreName }
+      : { address },
   };
 
   const submitBtn = document.getElementById('co-submit');
@@ -1216,6 +1337,8 @@ async function confirmCheckout() {
 
   try {
     const result = await Api.checkout(payload);
+    // 結帳送出後清掉已選門市,避免下次開 modal 還記得舊的
+    _selectedCvStore = null;
     if (result.paymentUrl) {
       showToast('正在跳轉到 LINE Pay...', true);
       closeCheckoutModal();
@@ -1934,6 +2057,8 @@ async function init() {
   hideLoading();
   // 套用 URL hash 路由（例如直接進到 #/cat/dog）
   applyHashRoute();
+  // 偵測 ECPay 選店 callback redirect 回來
+  handleCvStoreReturn();
 }
 
 init().catch(e => {
