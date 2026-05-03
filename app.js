@@ -192,6 +192,30 @@ function updateRolePill() {
 }
 
 /* ============================ PRODUCT SEARCH ============================ */
+/* 切換 body.searching + 更新狀態列文字; 從非搜尋進入搜尋時自動 scroll to top */
+function _setSearchingMode(query) {
+  const wasSearching = document.body.classList.contains('searching');
+  const isSearching = !!query;
+  document.body.classList.toggle('searching', isSearching);
+
+  if (isSearching) {
+    const productCount = ALL_PRODUCTS.filter(p => matchesSearchQuery(p, query)).length;
+    const visibleBundles = BUNDLES.filter(b => {
+      if (!b.active) return false;
+      if (b.visibility === 'public') return true;
+      return currentUser && (currentUser.role === 'dealer' || currentUser.role === 'admin');
+    });
+    const bundleCount = visibleBundles.filter(b => matchesBundleSearchQuery(b, query)).length;
+    const total = productCount + bundleCount;
+    const text = document.getElementById('search-status-text');
+    if (text) text.textContent = `搜尋「${query}」 ・ ${total} 件結果`;
+    if (!wasSearching) {
+      // 首次進入搜尋模式 → 捲到頂端讓使用者看到結果
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  }
+}
+
 function handleProductSearch() {
   const input = document.getElementById('product-search');
   if (!input) return;
@@ -206,6 +230,7 @@ function handleProductSearch() {
     renderProducts();
     renderBundleShop();
     renderBundleDealer();
+    _setSearchingMode(query);
   }, 250);
 }
 
@@ -218,6 +243,7 @@ function clearProductSearch() {
   renderProducts();
   renderBundleShop();
   renderBundleDealer();
+  _setSearchingMode('');
 }
 
 function matchesSearchQuery(product, query) {

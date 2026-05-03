@@ -116,6 +116,12 @@
      ============================ -->
 <div id="page-shop" class="page active">
 
+  <!-- 搜尋狀態列(只在搜尋模式顯示) -->
+  <div class="search-status-bar" id="search-status-bar" role="status" aria-live="polite">
+    <h3 id="search-status-text">搜尋結果</h3>
+    <button class="btn-outline" onclick="clearProductSearch()">✕ 清除搜尋</button>
+  </div>
+
   <!-- HERO -->
   <section class="hero-banner" aria-label="主視覺">
     <img class="hero-banner-bg" src="assets/banner.jpg" alt="" aria-hidden="true">

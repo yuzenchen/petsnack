@@ -106,10 +106,29 @@ body.role-admin .nav-links button.dealer-only,
 body.role-admin .nav-links button.admin-only{display:inline-block}
 
 /* ============================
-   SEARCH BAR
+   SEARCH BAR + 搜尋模式
    ============================ */
 .search-bar{display:none;align-items:center;gap:6px;flex:0 1 280px}
 @media(min-width:900px){.search-bar{display:flex}}
+
+/* 搜尋狀態列 — 預設隱藏,body.searching 才顯示 */
+.search-status-bar{
+  display:none;max-width:1200px;margin:24px auto 8px;padding:0 20px;
+  justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap;
+}
+.search-status-bar h3{
+  font-family:'Noto Sans TC',sans-serif;font-size:18px;font-weight:700;
+  color:var(--text);margin:0;letter-spacing:0.5px;
+}
+.search-status-bar .btn-outline{padding:8px 16px;font-size:13px}
+
+/* 搜尋模式:隱藏首頁裝飾區塊,只留商品/組合包列表 + filter chips */
+body.searching .search-status-bar{display:flex}
+body.searching #page-shop > .hero-banner,
+body.searching #page-shop > .category-showcase,
+body.searching #page-shop > .promise-band,
+body.searching #page-shop > .view-all-wrap,
+body.searching #page-shop > .section-title{display:none}
 .search-input{width:100%;padding:8px 12px;border-radius:20px;border:1.5px solid var(--border);background:var(--white);font-size:13px;color:var(--text);font-family:inherit;outline:none;transition:all .2s}
 .search-input:focus{border-color:var(--primary);box-shadow:0 0 0 3px rgba(216,129,102,0.1)}
 .search-input::placeholder{color:var(--text-light)}
