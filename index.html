@@ -127,22 +127,41 @@
   </div>
 
   <section class="category-showcase">
-    <div class="category-card" onclick="filterAndScroll('dog')"
-         onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();filterAndScroll('dog')}"
-         role="button" tabindex="0">
-      <span class="cat-emoji" aria-hidden="true">🐶</span>
-      <h4>Dog Treats<span class="zh">狗狗鮮肉零食</span></h4>
-      <p>精選低脂肉品，適合日常訓練。使用當日屠宰新鮮肉品，讓食材本身的鮮味，訴說產品的用心，小巧好入口，獎勵沒負擔。</p>
-      <a class="btn-outline" onclick="event.stopPropagation();filterAndScroll('dog')">更多狗狗零食</a>
-    </div>
-    <div class="category-card" onclick="filterAndScroll('cat')"
-         onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();filterAndScroll('cat')}"
-         role="button" tabindex="0">
-      <span class="cat-emoji" aria-hidden="true">🐱</span>
-      <h4>Cat Treats<span class="zh">貓咪海鮮零食</span></h4>
-      <p>挑選硬度適中食材，人工精細修除油膜，讓正在飲食控制中的貓咪也能享受開心啃咬的樂趣，清潔牙齒兼顧紓壓。</p>
-      <a class="btn-outline" onclick="event.stopPropagation();filterAndScroll('cat')">更多貓咪零食</a>
-    </div>
+    <article class="cat-showcase-row" data-cat="dog">
+      <div class="csr-img" aria-hidden="true">
+        <span class="csr-emoji">🐶</span>
+      </div>
+      <div class="csr-info">
+        <span class="csr-eyebrow">DOG TREATS</span>
+        <h3 class="csr-title">狗狗鮮肉零食系列</h3>
+        <p class="csr-desc">精選低脂肉品，適合日常訓練。使用當日屠宰新鮮肉品，讓食材本身的鮮味，訴說產品的用心。</p>
+        <button class="csr-cta" onclick="goCategory('dog')">更多狗狗零食 →</button>
+      </div>
+    </article>
+
+    <article class="cat-showcase-row reverse" data-cat="cat">
+      <div class="csr-img" aria-hidden="true">
+        <span class="csr-emoji">🐱</span>
+      </div>
+      <div class="csr-info">
+        <span class="csr-eyebrow">CAT TREATS</span>
+        <h3 class="csr-title">貓咪海鮮零食系列</h3>
+        <p class="csr-desc">挑選硬度適中食材，人工精細修除油膜，讓正在飲食控制中的貓咪也能享受開心啃咬的樂趣，清潔牙齒兼顧紓壓。</p>
+        <button class="csr-cta" onclick="goCategory('cat')">更多貓咪零食 →</button>
+      </div>
+    </article>
+
+    <article class="cat-showcase-row" data-cat="both">
+      <div class="csr-img" aria-hidden="true">
+        <span class="csr-emoji">🌟</span>
+      </div>
+      <div class="csr-info">
+        <span class="csr-eyebrow">UNIVERSAL TREATS</span>
+        <h3 class="csr-title">毛孩通用零食系列</h3>
+        <p class="csr-desc">狗狗貓咪都適用的精選配方，溫和不刺激，是多寵物家庭的理想選擇。</p>
+        <button class="csr-cta" onclick="goCategory('both')">更多通用零食 →</button>
+      </div>
+    </article>
   </section>
 
   <!-- 品質承諾 -->
@@ -173,6 +192,25 @@
   </div>
   <section class="product-grid" id="products-grid"></section>
   <div class="view-all-wrap"><button class="btn-outline" onclick="bundleScroll()">瀏覽全部商品 →</button></div>
+</div>
+
+<!-- ============================
+     CATEGORY PAGE (per-type subpage)
+     ============================ -->
+<div id="page-category" class="page">
+  <section class="cat-hero">
+    <div class="cat-hero-bg" id="cat-hero-bg" aria-hidden="true">
+      <span class="cat-hero-emoji" id="cat-hero-emoji">🐶</span>
+    </div>
+    <div class="cat-hero-info">
+      <span class="csr-eyebrow" id="cat-hero-eyebrow">DOG TREATS</span>
+      <h2 id="cat-hero-title">狗狗鮮肉零食系列</h2>
+      <p id="cat-hero-desc">精選低脂肉品，適合日常訓練。</p>
+      <a href="#/" class="cat-hero-back">← 回首頁</a>
+    </div>
+  </section>
+  <section class="product-grid" id="cat-products-grid"></section>
+  <div class="view-all-wrap"><a href="#/" class="btn-outline">← 回首頁瀏覽全部</a></div>
 </div>
 
 <!-- ============================

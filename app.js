@@ -166,7 +166,7 @@ function updateRolePill() {
 }
 
 /* ============================ PAGE SWITCH ============================ */
-function switchPage(name) {
+function switchPage(name, opts = {}) {
   if ((name === 'dealer' && !currentUser) || (name === 'admin' && (!currentUser || currentUser.role !== 'admin'))) {
     openLoginModal();
     return;
@@ -179,6 +179,12 @@ function switchPage(name) {
   if (navLink) { navLink.classList.add('active'); navLink.setAttribute('aria-selected', 'true'); }
   const bnav = document.getElementById('bnav-' + name);
   if (bnav) bnav.classList.add('active');
+  // 切到非分類頁時,清掉 hash 路由（避免重整跳回分類頁）
+  if (name !== 'category' && !opts.skipHashSync) {
+    if (location.hash && location.hash !== '#/') {
+      history.replaceState(null, '', location.pathname + location.search);
+    }
+  }
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
@@ -189,6 +195,71 @@ function filterAndScroll(type) {
   if (btn) filterProds(type, btn);
   setTimeout(() => document.getElementById('products-grid').scrollIntoView({ behavior: 'smooth', block: 'start' }), 200);
 }
+
+/* ============================ CATEGORY PAGE & HASH ROUTING ============================ */
+const CATEGORY_META = {
+  dog:  { eyebrow: 'DOG TREATS',       title: '狗狗鮮肉零食系列', emoji: '🐶',
+          desc: '精選低脂肉品,適合日常訓練。使用當日屠宰新鮮肉品,讓食材本身的鮮味,訴說產品的用心。' },
+  cat:  { eyebrow: 'CAT TREATS',       title: '貓咪海鮮零食系列', emoji: '🐱',
+          desc: '挑選硬度適中食材,人工精細修除油膜,讓正在飲食控制中的貓咪也能享受開心啃咬的樂趣。' },
+  both: { eyebrow: 'UNIVERSAL TREATS', title: '毛孩通用零食系列', emoji: '🌟',
+          desc: '狗狗貓咪都適用的精選配方,溫和不刺激,是多寵物家庭的理想選擇。' },
+};
+
+function goCategory(type) {
+  if (!CATEGORY_META[type]) return;
+  location.hash = '#/cat/' + type;
+}
+
+function renderCategoryPage(type) {
+  const meta = CATEGORY_META[type];
+  if (!meta) return;
+  document.getElementById('cat-hero-eyebrow').textContent = meta.eyebrow;
+  document.getElementById('cat-hero-title').textContent = meta.title;
+  document.getElementById('cat-hero-desc').textContent = meta.desc;
+  document.getElementById('cat-hero-emoji').textContent = meta.emoji;
+
+  const grid = document.getElementById('cat-products-grid');
+  const list = ALL_PRODUCTS.filter(p => p.type === type || (type !== 'both' && p.type === 'both'));
+  if (!list.length) {
+    grid.innerHTML = '<p style="grid-column:1/-1;text-align:center;color:var(--text-light);padding:40px">此分類目前無商品</p>';
+    return;
+  }
+  const lbl = { new: '新品', hot: '熱賣', sale: '優惠' };
+  grid.innerHTML = list.map(p => {
+    const tracked = p.trackStock !== false;
+    const isOut = tracked && (p.stock ?? 0) <= 0;
+    const badge = stockBadgeHtml(p.stock, p.lowStockThreshold ?? 5, p.trackStock);
+    return `
+    <article class="product-card${isOut ? ' is-out' : ''}" onclick="openProductModal('prod',${p.id})" style="cursor:pointer" tabindex="0" onkeydown="if(event.key==='Enter')openProductModal('prod',${p.id})">
+      ${p.badge ? `<span class="product-badge ${p.badge}">${lbl[p.badge]}</span>` : ''}
+      ${productMediaHtml(p)}
+      <div class="product-info">
+        <h5>${escHtml(p.name)}</h5>
+        <div class="product-sub">${escHtml(p.sub || '')}</div>
+        <div class="price-wrap">
+          <span class="price-sale">NT$ ${p.price}</span>
+          ${p.orig ? `<span class="price-regular">NT$ ${p.orig}</span>` : ''}
+        </div>
+        ${badge}
+      </div>
+      <button class="add-cart-btn" ${isOut ? 'disabled aria-disabled="true"' : ''} onclick="event.stopPropagation();addToCart('prod_${p.id}','${escAttrJs(p.emoji + ' ' + p.name)}','單品',${p.price},this)">${isOut ? '缺貨中' : '加入購物車'}</button>
+    </article>`;
+  }).join('');
+}
+
+function applyHashRoute() {
+  const m = (location.hash || '').match(/^#\/cat\/(dog|cat|both)$/);
+  if (m) {
+    switchPage('category', { skipHashSync: true });
+    renderCategoryPage(m[1]);
+  } else {
+    // 空 hash 或 #/ → 若目前停在分類頁,切回首頁
+    const onCat = document.getElementById('page-category')?.classList.contains('active');
+    if (onCat) switchPage('shop', { skipHashSync: true });
+  }
+}
+window.addEventListener('hashchange', applyHashRoute);
 
 function bundleScroll() {
   switchPage('shop');
@@ -1664,6 +1735,8 @@ async function init() {
   renderCart();
   handlePaymentRedirect();
   hideLoading();
+  // 套用 URL hash 路由（例如直接進到 #/cat/dog）
+  applyHashRoute();
 }
 
 init().catch(e => {
