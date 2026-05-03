@@ -786,9 +786,14 @@ function renderCart() {
     const [emoji, ...nameParts] = item.name.split(' ');
     const isDealer = item.type === '經銷組合包';
     const isAddon = item.type === '加價購';
+    const emojiArr = Array.from(emoji || '');
+    const isMulti = emojiArr.length > 1;
+    const emojiInner = isMulti
+      ? `<span class="cart-emoji-grid">${emojiArr.slice(0, 4).map(e => `<span>${escHtml(e)}</span>`).join('')}</span>`
+      : escHtml(emoji);
     return `
       <div class="cart-item${isAddon ? ' addon-item' : ''}">
-        <span class="cart-item-emoji" aria-hidden="true">${emoji}</span>
+        <span class="cart-item-emoji${isMulti ? ' bundle' : ''}" aria-hidden="true">${emojiInner}</span>
         <div class="cart-item-info">
           <div class="cart-item-name">${nameParts.join(' ')}</div>
           <div class="cart-item-type ${isDealer ? 'dealer' : isAddon ? 'addon' : ''}">${isDealer ? '💼 ' : isAddon ? '🎁 ' : ''}${item.type}</div>

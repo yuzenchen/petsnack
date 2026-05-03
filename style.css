@@ -389,7 +389,10 @@ input:focus,select:focus,textarea:focus{border-color:var(--primary);box-shadow:0
   display:flex;gap:14px;align-items:center;box-shadow:var(--shadow-sm);
 }
 .cart-item.addon-item{border-color:var(--am-light);background:#FFFCF6}
-.cart-item-emoji{font-size:36px;flex-shrink:0;width:60px;height:60px;background:var(--accent-banner);border-radius:8px;display:flex;align-items:center;justify-content:center}
+.cart-item-emoji{font-size:36px;flex-shrink:0;width:60px;height:60px;background:var(--accent-banner);border-radius:8px;display:flex;align-items:center;justify-content:center;overflow:hidden}
+.cart-item-emoji.bundle{font-size:20px;padding:4px}
+.cart-emoji-grid{display:flex;flex-wrap:wrap;gap:2px;width:100%;height:100%;align-items:center;align-content:center;justify-content:center;line-height:1}
+.cart-emoji-grid > span{font-size:inherit}
 .cart-item.addon-item .cart-item-emoji{background:var(--am-light)}
 .cart-item-info{flex:1;min-width:0}
 .cart-item-name{font-size:14px;font-weight:700;margin-bottom:2px;color:var(--text)}
