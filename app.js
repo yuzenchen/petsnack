@@ -29,6 +29,9 @@ let currentFilter = 'all';
 let currentVisibility = 'public';
 let currentUser = null;
 let _lastFocusedBeforeModal = null;
+let currentSearchQuery = '';
+let _searchTimer = null;
+let _mobileSearchTimer = null;
 
 /* ============================ AUTH ============================ */
 function openLoginModal() {
@@ -63,13 +66,26 @@ const _MODAL_CLOSERS = {
 };
 document.addEventListener('click', function (e) {
   const overlay = e.target;
-  if (!overlay.classList || !overlay.classList.contains('modal-overlay')) return;
+  if (!overlay.classList) return;
+  // 標準 modal 或 search overlay,只在點到背景本體時關閉
+  const isModal = overlay.classList.contains('modal-overlay');
+  const isSearchOverlay = overlay.classList.contains('search-overlay');
+  if (!isModal && !isSearchOverlay) return;
   if (!overlay.classList.contains('active')) return;
+  if (isSearchOverlay) {
+    closeSearchOverlay();
+    return;
+  }
   const closer = _MODAL_CLOSERS[overlay.id];
   if (closer) closer();
 });
 
 document.addEventListener('keydown', function (e) {
+  // 手機搜尋 overlay: Escape 關閉
+  const searchO = document.getElementById('search-overlay');
+  if (searchO && searchO.classList.contains('active')) {
+    if (e.key === 'Escape') { e.preventDefault(); closeSearchOverlay(); return; }
+  }
   // 商品詳情 modal: Escape 關閉
   const prodM = document.getElementById('product-modal');
   if (prodM && prodM.classList.contains('active')) {
@@ -155,6 +171,16 @@ async function tryRestoreSession() {
   }
 }
 
+/* 控制手機搜尋 icon 的顯示
+   用 matchMedia 只在跨越斷點時觸發,比 resize listener 高效 */
+const _mobileMQ = window.matchMedia('(max-width: 899px)');
+function updateSearchIconVisibility() {
+  const icon = document.getElementById('bnav-search');
+  if (icon) icon.style.display = _mobileMQ.matches ? 'flex' : 'none';
+}
+_mobileMQ.addEventListener('change', updateSearchIconVisibility);
+document.addEventListener('DOMContentLoaded', updateSearchIconVisibility);
+
 function updateRolePill() {
   const pill = document.getElementById('role-pill');
   const icon = document.getElementById('role-icon');
@@ -163,6 +189,143 @@ function updateRolePill() {
   if (!currentUser) { icon.textContent = '👤'; text.textContent = '登入 / 註冊'; }
   else if (currentUser.role === 'dealer') { pill.classList.add('dealer'); icon.textContent = '💼'; text.textContent = currentUser.displayName; }
   else if (currentUser.role === 'admin') { pill.classList.add('admin'); icon.textContent = '⚙️'; text.textContent = currentUser.displayName; }
+}
+
+/* ============================ PRODUCT SEARCH ============================ */
+function handleProductSearch() {
+  const input = document.getElementById('product-search');
+  if (!input) return;
+  const query = input.value.trim();
+  const clearBtn = document.getElementById('search-clear-btn');
+  if (clearBtn) clearBtn.style.display = query.length > 0 ? 'block' : 'none';
+  clearTimeout(_searchTimer);
+  _searchTimer = setTimeout(() => {
+    currentSearchQuery = query;
+    const onShop = document.getElementById('page-shop')?.classList.contains('active');
+    if (!onShop && query) switchPage('shop');
+    renderProducts();
+    renderBundleShop();
+    renderBundleDealer();
+  }, 250);
+}
+
+function clearProductSearch() {
+  const input = document.getElementById('product-search');
+  const clearBtn = document.getElementById('search-clear-btn');
+  if (input) { input.value = ''; input.focus(); }
+  if (clearBtn) clearBtn.style.display = 'none';
+  currentSearchQuery = '';
+  renderProducts();
+  renderBundleShop();
+  renderBundleDealer();
+}
+
+function matchesSearchQuery(product, query) {
+  if (!query) return true;
+  const lowerQuery = query.toLowerCase();
+  const searchableFields = [product.name || '', product.sub || ''];
+  return searchableFields.some(field => String(field).toLowerCase().includes(lowerQuery));
+}
+
+function matchesBundleSearchQuery(bundle, query) {
+  if (!query) return true;
+  const lowerQuery = query.toLowerCase();
+  const bundleName = bundle.name || '';
+  const bundleTag = bundle.tag || '';
+  if (bundleName.toLowerCase().includes(lowerQuery) || bundleTag.toLowerCase().includes(lowerQuery)) return true;
+  const items = bundle.items?.map(getProduct).filter(Boolean) || [];
+  return items.some(p => matchesSearchQuery(p, query));
+}
+
+/* 手機搜尋 Overlay */
+function openSearchOverlay() {
+  const overlay = document.getElementById('search-overlay');
+  if (overlay) {
+    overlay.classList.add('active');
+    overlay.setAttribute('aria-hidden', 'false');
+    setTimeout(() => document.getElementById('mobile-product-search')?.focus(), 100);
+  }
+}
+
+function closeSearchOverlay() {
+  const overlay = document.getElementById('search-overlay');
+  if (overlay) {
+    overlay.classList.remove('active');
+    overlay.setAttribute('aria-hidden', 'true');
+    const input = document.getElementById('mobile-product-search');
+    if (input) input.value = '';
+  }
+}
+
+function handleMobileSearch() {
+  const input = document.getElementById('mobile-product-search');
+  if (!input) return;
+  const query = input.value.trim();
+  const clearBtn = document.getElementById('mobile-search-clear');
+  if (clearBtn) clearBtn.style.display = query.length > 0 ? 'block' : 'none';
+  clearTimeout(_mobileSearchTimer);
+  _mobileSearchTimer = setTimeout(() => {
+    renderMobileSearchResults(query);
+  }, 250);
+}
+
+function clearMobileSearch() {
+  const input = document.getElementById('mobile-product-search');
+  const clearBtn = document.getElementById('mobile-search-clear');
+  if (input) { input.value = ''; input.focus(); }
+  if (clearBtn) clearBtn.style.display = 'none';
+  renderMobileSearchResults('');
+}
+
+function renderMobileSearchResults(query) {
+  const container = document.getElementById('search-results-container');
+  if (!container) return;
+  if (!query) {
+    container.innerHTML = '<div class="search-result-empty">輸入商品名稱開始搜尋</div>';
+    return;
+  }
+  const products = ALL_PRODUCTS.filter(p => matchesSearchQuery(p, query));
+  const bundles = BUNDLES
+    .filter(b => b.active && (b.visibility === 'public' || (currentUser && (currentUser.role === 'dealer' || currentUser.role === 'admin'))))
+    .filter(b => matchesBundleSearchQuery(b, query));
+
+  if (!products.length && !bundles.length) {
+    container.innerHTML = `<div class="search-result-empty">搜尋「${escHtml(query)}」無結果</div>`;
+    return;
+  }
+
+  const productItems = products.map(p => `
+    <button type="button" class="search-result-item" onclick="selectSearchResult('prod',${p.id})">
+      <div class="search-result-emoji">${escHtml(p.emoji)}</div>
+      <div class="search-result-info">
+        <div class="search-result-name">${escHtml(p.name)}</div>
+        ${p.sub ? `<div class="search-result-sub">${escHtml(p.sub)}</div>` : ''}
+      </div>
+      <div class="search-result-price">NT$ ${p.price}</div>
+    </button>`).join('');
+
+  const bundleItems = bundles.map(b => {
+    const final = bundleFinal(b);
+    const items = (b.items || []).map(getProduct).filter(Boolean);
+    const emojis = items.map(p => p.emoji).join('');
+    return `
+    <button type="button" class="search-result-item" onclick="selectSearchResult('bundle',${b.id})">
+      <div class="search-result-emoji">${escHtml(emojis || '📦')}</div>
+      <div class="search-result-info">
+        <div class="search-result-name">${escHtml(b.name)} <span class="search-result-tag">組合包</span></div>
+        ${b.tag ? `<div class="search-result-sub">${escHtml(b.tag)}</div>` : ''}
+      </div>
+      <div class="search-result-price">NT$ ${final}</div>
+    </button>`;
+  }).join('');
+
+  container.innerHTML = productItems + bundleItems;
+}
+
+/* 點搜尋結果 → 開商品詳情 modal,讓使用者看完再決定要不要加購 */
+function selectSearchResult(itemType, id) {
+  closeSearchOverlay();
+  openProductModal(itemType, id);
 }
 
 /* ============================ PAGE SWITCH ============================ */
@@ -394,9 +557,15 @@ function filterProds(type, btn) {
 
 function renderProducts() {
   const grid = document.getElementById('products-grid');
-  const list = currentFilter === 'all' ? ALL_PRODUCTS
+  let list = currentFilter === 'all' ? ALL_PRODUCTS
     : ALL_PRODUCTS.filter(p => p.type === currentFilter || p.type === 'both');
+  list = list.filter(p => matchesSearchQuery(p, currentSearchQuery));
   const lbl = { new: '新品', hot: '熱賣', sale: '優惠' };
+  if (!list.length) {
+    const msg = currentSearchQuery ? `搜尋「${escHtml(currentSearchQuery)}」無結果` : '此分類無商品';
+    grid.innerHTML = `<p style="grid-column:1/-1;text-align:center;color:var(--text-light);padding:40px">${msg}</p>`;
+    return;
+  }
   grid.innerHTML = list.map(p => {
     const tracked = p.trackStock !== false;
     const isOut = tracked && (p.stock ?? 0) <= 0;
@@ -426,7 +595,8 @@ function bundleFinal(b) { return Math.round(bundleOrig(b) * (1 - b.disc / 100));
 
 function renderBundleShop() {
   const el = document.getElementById('bundle-grid-shop');
-  const list = BUNDLES.filter(b => b.active && b.visibility === 'public');
+  let list = BUNDLES.filter(b => b.active && b.visibility === 'public');
+  list = list.filter(b => matchesBundleSearchQuery(b, currentSearchQuery));
   if (!list.length) { el.innerHTML = '<p style="grid-column:1/-1;text-align:center;color:var(--text-light);padding:40px">目前無上架組合包</p>'; return; }
   el.innerHTML = list.map(b => renderBundleCard(b, false)).join('');
 }
@@ -434,7 +604,8 @@ function renderBundleShop() {
 function renderBundleDealer() {
   const el = document.getElementById('bundle-grid-dealer');
   if (!el) return;
-  const list = BUNDLES.filter(b => b.active && b.visibility === 'dealer');
+  let list = BUNDLES.filter(b => b.active && b.visibility === 'dealer');
+  list = list.filter(b => matchesBundleSearchQuery(b, currentSearchQuery));
   if (!list.length) { el.innerHTML = '<p style="grid-column:1/-1;text-align:center;color:var(--text-light);padding:40px">目前無經銷專屬組合包</p>'; return; }
   el.innerHTML = list.map(b => renderBundleCard(b, true)).join('');
 }
