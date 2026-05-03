@@ -5,6 +5,9 @@
 /* ===== Reset:移除瀏覽器預設邊距、統一 box-sizing,避免跨瀏覽器差異 ===== */
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 
+/* 永遠保留 scrollbar 空間,避免 modal 開啟時內容相對 viewport 向左偏移 */
+html{scrollbar-gutter:stable}
+
 /* ===== 全域設計變數 (Design Tokens):整個網站只在這裡定義色票/圓角/陰影,
         修改主題只需改這一處,避免到處改 hex code ===== */
 :root{
