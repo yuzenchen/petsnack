@@ -1030,9 +1030,12 @@ async function editBundleSchedule(bundleId) {
     endsAt = d.toISOString();
   }
   try {
-    await Api.adminUpdateBundle(bundleId, { endsAt });
+    // 設定新 endsAt 同時帶 active=true:過期被 cron 設成 active=false 的組合包,
+    // 重設限時 (新時間 OR 改永久) 應該自動恢復上架,不必再手動點「上架」。
+    // 若 admin 想保持下架,可獨立用「上架/下架」按鈕切換。
+    await Api.adminUpdateBundle(bundleId, { endsAt, active: true });
     await reloadAdminLists();
-    showToast(endsAt ? '✓ 限時時間已更新' : '✓ 已改為永久上架', true);
+    showToast(endsAt ? '✓ 限時時間已更新並重新上架' : '✓ 已改為永久上架', true);
   } catch (e) { showToast('更新失敗: ' + e.message, false); }
 }
 
@@ -2316,9 +2319,22 @@ async function saveProductMeta(productId) {
   const endsAtRaw = panel.querySelector('.meta-endsAt')?.value || '';
   // 空值送 null 給後端清除限時;有值轉 ISO 字串
   const endsAt = endsAtRaw ? new Date(endsAtRaw).toISOString() : null;
+
+  // 找到目前的 product 看 endsAt 是否真的有變動
+  const cur = (_adminStockCache?.products || []).find((p) => p.id === productId);
+  const curEndsAtIso = cur?.endsAt ? new Date(cur.endsAt).toISOString() : null;
+  const endsAtChanged = endsAt !== curEndsAtIso;
+
+  // 只有當 endsAt 真的變動時才強制 active=true
+  // (避免使用者只改圖片/描述時也把已下架商品自動上架)
+  const payload = { imageUrl, description, endsAt };
+  if (endsAtChanged) payload.active = true;
+
   try {
-    await Api.adminUpdateProduct(productId, { imageUrl, description, endsAt });
-    showToast('✓ 商品資訊已更新', true);
+    await Api.adminUpdateProduct(productId, payload);
+    showToast(endsAtChanged
+      ? (endsAt ? '✓ 已更新限時時間並重新上架' : '✓ 已改為永久上架')
+      : '✓ 商品資訊已更新', true);
     await loadStockList();
     reloadCatalog();
   } catch (e) {
