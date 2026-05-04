@@ -1397,8 +1397,13 @@ async function submitDealerCheckout(items) {
   if (btn) { btn.disabled = true; btn.textContent = '處理中...'; }
   try {
     const result = await Api.checkout(payload);
-    showToast(`✓ 訂貨單已送出 (${result.orderId})`, true);
     cart = {}; saveCart(); updateCartBadge(); renderCart();
+    // 跟一般訂單一致 — 開訂單詳情 modal 給經銷商看
+    if (result.orderId) {
+      openOrderConfirmModal(result.orderId, false);
+    } else {
+      showToast(`✓ 訂貨單已送出 (${result.orderId || ''})`, true);
+    }
   } catch (e) {
     showToast('結帳失敗: ' + e.message, false);
     if (btn) { btn.disabled = false; btn.textContent = '送出訂貨單 →'; }
@@ -1883,8 +1888,19 @@ function renderOrderConfirmContent(o, isLookup) {
       ${(!o.shippingInfo?.cvsPaymentNo && !o.shippingInfo?.cvsValidationNo) ? `<div class="occ-addr-row" style="color:var(--text-light);font-size:12px">物流單建立中,稍後再查可看到取貨碼</div>` : ''}
     </div>` : '';
 
-  /* --- 收件人資訊 --- */
-  const recipientBlock = (o.customer?.name || o.customer?.phone || o.shippingInfo?.address) ? `
+  /* --- 收件人資訊 (一般 vs 經銷分開渲染) --- */
+  const isDealerOrder = o.orderType === 'dealer';
+  const recipientBlock = isDealerOrder
+    ? `<div class="occ-shipping">
+        <div class="occ-section-label">經銷訂貨資訊</div>
+        ${o.shippingMethod ? `<div class="occ-addr-row">${shippingMethodLabel(o.shippingMethod)}</div>` : ''}
+        ${o.dealer?.shopName ? `<div class="occ-addr-row">🏪 ${escHtml(o.dealer.shopName)}</div>` : ''}
+        ${o.dealer?.contact ? `<div class="occ-addr-row">👤 聯絡人:${escHtml(o.dealer.contact)}</div>` : ''}
+        ${o.dealer?.phone ? `<div class="occ-addr-row">📞 ${escHtml(o.dealer.phone)}</div>` : ''}
+        ${o.dealer?.deliveryDate ? `<div class="occ-addr-row">📅 預計交貨:${escHtml(o.dealer.deliveryDate)}</div>` : ''}
+        ${o.dealer?.note ? `<div class="occ-addr-row">📝 備註:${escHtml(o.dealer.note)}</div>` : ''}
+      </div>`
+    : (o.customer?.name || o.customer?.phone || o.shippingInfo?.address) ? `
     <div class="occ-shipping">
       <div class="occ-section-label">收件資訊</div>
       ${o.shippingMethod ? `<div class="occ-addr-row">${shippingMethodLabel(o.shippingMethod)}</div>` : ''}
