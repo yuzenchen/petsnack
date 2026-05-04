@@ -1736,11 +1736,20 @@ function renderOrderDetail(o) {
 
       <div class="od-section">
         <h4 class="od-title">物流資訊</h4>
-        <div class="od-row"><span>方式</span>${o.shippingMethod || '-'}</div>
-        <div class="od-row"><span>地址</span>${o.shippingInfo?.address || '-'}</div>
+        <div class="od-row"><span>方式</span>${shippingMethodLabel(o.shippingMethod)}</div>
+        ${o.shippingMethod === 'convenience_store' ? `
+          <div class="od-row"><span>取貨門市</span>${escHtml(o.shippingInfo?.cvStoreName || '-')}${o.shippingInfo?.cvStoreId ? ` <code style="font-size:11px;color:var(--text-light)">(${escHtml(o.shippingInfo.cvStoreId)})</code>` : ''}</div>
+          <div class="od-row"><span>ECPay 物流單號</span>${o.shippingInfo?.ecpayAllPayLogisticsId ? `<code style="font-size:11px">${escHtml(o.shippingInfo.ecpayAllPayLogisticsId)}</code>` : '<span style="color:var(--red)">⚠ 尚未建立</span>'}</div>
+          ${!o.shippingInfo?.ecpayAllPayLogisticsId ? `
+            <div style="margin:10px 0">
+              <button class="pill-btn green" onclick="adminBuildLogistics('${encodeURIComponent(o.orderId)}')">📦 補建 ECPay 物流單</button>
+            </div>` : ''}
+        ` : `
+          <div class="od-row"><span>地址</span>${escHtml(o.shippingInfo?.address || '-')}</div>
+        `}
         <div class="od-form">
-          <label for="tracking-input">物流單號</label>
-          <input type="text" id="tracking-input" value="${o.shippingInfo?.trackingNo || ''}" placeholder="例: 9999-1234-5678">
+          <label for="tracking-input">手動物流單號</label>
+          <input type="text" id="tracking-input" value="${escHtml(o.shippingInfo?.trackingNo || '')}" placeholder="例: 9999-1234-5678">
           <button class="pill-btn green" onclick="saveTracking('${encodeURIComponent(o.orderId)}')">儲存單號</button>
         </div>
       </div>
@@ -1772,6 +1781,28 @@ async function advanceOrderStatus(orderIdEnc, newStatus) {
     loadDashboardStats();
   } catch (e) {
     showToast('狀態更新失敗:' + e.message, false);
+  }
+}
+
+const _SHIPPING_METHOD_LABEL = {
+  home_delivery: '🚚 宅配到府',
+  convenience_store: '🏪 7-11 取貨',
+  dealer_logistics: '💼 經銷物流',
+};
+function shippingMethodLabel(m) {
+  return _SHIPPING_METHOD_LABEL[m] || m || '-';
+}
+
+async function adminBuildLogistics(orderIdEnc) {
+  const orderId = decodeURIComponent(orderIdEnc);
+  if (!confirm(`確定要為訂單 ${orderId} 補建 ECPay 物流單?`)) return;
+  try {
+    const res = await Api.adminCreateEcpayLogistics(orderId);
+    showToast('✓ ' + (res.message || '物流單已建立'), true);
+    // 重整訂單詳情
+    openOrderModal(orderIdEnc);
+  } catch (e) {
+    showToast('建立失敗: ' + (e.message || ''), false);
   }
 }
 

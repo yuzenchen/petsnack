@@ -198,6 +198,12 @@
         body: JSON.stringify(refundAmount ? { refundAmount } : {}),
       });
     },
+    adminCreateEcpayLogistics(orderId) {
+      return this._fetch('/admin/orders/' + encodeURIComponent(orderId) + '/logistics/ecpay', {
+        method: 'POST',
+        body: JSON.stringify({}),
+      });
+    },
     adminStats() {
       return this._fetch('/admin/stats');
     },
