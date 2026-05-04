@@ -526,33 +526,52 @@ function formatCountdown(ms) {
   return `${pad(h)}:${pad(m)}:${pad(s)}`;
 }
 
-/* 全域 tick:每秒更新所有 .countdown-timer 文字;到 0 時 hide 並重載 catalog */
+/* 全域 tick:每秒更新所有 .countdown-timer 文字
+   倒數歸零 → 直接把所屬卡片從 DOM 移除 (不重打 API,避免 reloadCatalog 把
+   整個 grid 換成 skeleton 造成閃爍;伺服器端 lazy filter + cron 會在下次
+   頁面載入時自然同步)。
+   modal 中的倒數歸零 → 顯示「已結束」+ 禁用加入購物車按鈕。 */
 let _countdownInterval = null;
 function startCountdownTicker() {
   if (_countdownInterval) return;
-  _countdownInterval = setInterval(() => {
-    const els = document.querySelectorAll('.countdown-timer[data-ends-at]');
-    if (!els.length) return;
-    let needReload = false;
-    els.forEach((el) => {
-      const ms = new Date(el.dataset.endsAt).getTime() - Date.now();
-      if (ms <= 0) {
-        el.textContent = '⏳ 已結束';
-        el.classList.add('expired');
-        needReload = true;
-      } else {
-        el.textContent = '⏳ ' + formatCountdown(ms);
-        if (ms <= 3600 * 1000) el.classList.add('urgent');
-      }
-    });
-    if (needReload) {
-      // 至少 30 秒節流避免狂打 API
-      if (!_countdownInterval._lastReload || Date.now() - _countdownInterval._lastReload > 30000) {
-        _countdownInterval._lastReload = Date.now();
-        if (typeof reloadCatalog === 'function') reloadCatalog().catch(() => {});
+  _countdownInterval = setInterval(_tickCountdowns, 1000);
+}
+
+function _tickCountdowns() {
+  const els = document.querySelectorAll('.countdown-timer[data-ends-at]');
+  if (!els.length) return;
+  els.forEach((el) => {
+    const ms = new Date(el.dataset.endsAt).getTime() - Date.now();
+    if (ms > 0) {
+      el.textContent = '⏳ ' + formatCountdown(ms);
+      if (ms <= 3600 * 1000) el.classList.add('urgent');
+      return;
+    }
+    // 到期:依元素位置決定處置
+    el.classList.remove('urgent');
+    el.classList.add('expired');
+    el.textContent = '⏳ 已結束';
+    delete el.dataset.endsAt; // 防止下一輪 tick 重複處理
+
+    const card = el.closest('.product-card');
+    if (card) {
+      // 商品/組合包卡片 — 直接移除 (淡出動畫)
+      card.style.transition = 'opacity .35s ease, transform .35s ease';
+      card.style.opacity = '0';
+      card.style.transform = 'scale(.96)';
+      setTimeout(() => card.remove(), 360);
+      return;
+    }
+    // modal / admin 列表 / 其他位置 — 不移除,顯示「已結束」+ 禁用加購按鈕
+    const pmd = el.closest('.pmd-info, .pmd-layout');
+    if (pmd) {
+      const cartBtn = pmd.querySelector('.pmd-cart-btn');
+      if (cartBtn) {
+        cartBtn.disabled = true;
+        cartBtn.textContent = '⏳ 限時銷售已結束';
       }
     }
-  }, 1000);
+  });
 }
 
 /* HTML / 屬性內 JS 字串跳脫 helper */
