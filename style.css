@@ -377,6 +377,55 @@ body.searching #page-shop > .section-title{display:none}
 }
 .product-badge.new{background:var(--gr)}
 .product-badge.hot{background:#E8784A}
+
+/* ====== COUNTDOWN TIMER (限時上架倒數) ====== */
+.countdown-timer{
+  display:inline-flex;align-items:center;gap:4px;
+  background:rgba(0,0,0,0.78);color:#fff;
+  font-size:11px;font-weight:700;letter-spacing:.5px;
+  padding:4px 8px;border-radius:4px;
+  font-variant-numeric:tabular-nums;line-height:1;
+}
+/* 卡片右上 (相對於 .product-card) */
+.product-card .countdown-timer.cd-sm{
+  position:absolute;top:10px;right:10px;z-index:2;
+}
+/* bundle 已經有 .bundle-ribbon 在右上 → countdown 移到 ribbon 下方 */
+.bundle-card .countdown-timer.cd-sm{
+  top:38px;right:10px;
+}
+.countdown-timer.cd-lg{
+  font-size:14px;padding:6px 12px;letter-spacing:1px;
+}
+.countdown-timer.urgent{
+  background:#D04545;animation:cd-pulse 1.4s ease-in-out infinite;
+}
+.countdown-timer.expired{background:#888;animation:none}
+@keyframes cd-pulse{
+  0%,100%{box-shadow:0 0 0 0 rgba(208,69,69,0.5)}
+  50%{box-shadow:0 0 0 6px rgba(208,69,69,0)}
+}
+/* 商品 modal 的限時優惠倒數區 */
+.pmd-countdown-wrap{
+  display:flex;align-items:center;gap:10px;
+  background:linear-gradient(135deg,#FFF1EB 0%,#FFE4D6 100%);
+  border:1px solid #F0BFA5;
+  padding:10px 14px;border-radius:var(--radius-md);
+  margin:10px 0;
+}
+.pmd-countdown-label{
+  font-size:12px;color:#9E5530;font-weight:600;letter-spacing:1px;
+}
+/* admin 列表中限時資訊 */
+.bli-schedule{
+  font-size:11px;color:var(--text-light);margin-top:4px;
+  font-weight:500;
+}
+.bli-schedule.expired{color:#D04545;font-weight:700}
+.bli-schedule code{
+  background:var(--bg);padding:1px 5px;border-radius:3px;
+  font-size:11px;color:var(--text);
+}
 .product-img{
   width:100%;aspect-ratio:1;background:var(--accent-banner);
   display:flex;align-items:center;justify-content:center;

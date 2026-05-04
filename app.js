@@ -422,6 +422,7 @@ function renderCategoryPage(type) {
     return `
     <article class="product-card${isOut ? ' is-out' : ''}" onclick="openProductModal('prod',${p.id})" style="cursor:pointer" tabindex="0" onkeydown="if(event.key==='Enter')openProductModal('prod',${p.id})">
       ${p.badge ? `<span class="product-badge ${p.badge}">${lbl[p.badge]}</span>` : ''}
+      ${countdownBadgeHtml(p.endsAt)}
       ${productMediaHtml(p)}
       <div class="product-info">
         <h5>${escHtml(p.name)}</h5>
@@ -463,9 +464,11 @@ function _normalizeProduct(p) {
     stock: p.stock, lowStockThreshold: p.lowStockThreshold,
     trackStock: p.trackStock, stockStatus: p.stockStatus,
     imageUrl: p.imageUrl || '', description: p.description || '',
+    endsAt: p.endsAt || null,
+    active: p.active !== false,
   };
 }
-function _normalizeBundle(b)  { return { id: b.bundleId, name: b.name, tag: b.tag, items: b.items, disc: b.disc, visibility: b.visibility, active: b.active, imageUrl: b.imageUrl || '', description: b.description || '' }; }
+function _normalizeBundle(b)  { return { id: b.bundleId, name: b.name, tag: b.tag, items: b.items, disc: b.disc, visibility: b.visibility, active: b.active, imageUrl: b.imageUrl || '', description: b.description || '', endsAt: b.endsAt || null }; }
 function _normalizeAddon(a) {
   return {
     id: a.addonId, name: a.name, emoji: a.emoji,
@@ -495,6 +498,61 @@ function stockBadgeHtml(stockOrItem, lowThreshold = 5, trackStock = true) {
   if (stock <= 0) return '<span class="stock-badge out">缺貨</span>';
   if (stock <= lowThreshold) return `<span class="stock-badge low">僅剩 ${stock} 件</span>`;
   return '<span class="stock-badge ok">有現貨</span>';
+}
+
+/* ============================ COUNTDOWN ============================ */
+/* 把 endsAt (ISO 字串 / Date / null) 轉成倒數 badge HTML
+   class="countdown-timer" + data-ends-at,讓全域 tick 每秒更新文字 */
+function countdownBadgeHtml(endsAt, opts = {}) {
+  if (!endsAt) return '';
+  const ms = new Date(endsAt).getTime() - Date.now();
+  if (Number.isNaN(ms) || ms <= 0) return ''; // 已過期 (lazy filter 應該已濾掉,雙保險)
+  const size = opts.size || 'sm'; // sm | lg
+  const isUrgent = ms <= 3600 * 1000; // < 1hr 紅色 + pulse
+  const text = formatCountdown(ms);
+  const ts = new Date(endsAt).toLocaleString('zh-TW', { hour12: false });
+  return `<span class="countdown-timer cd-${size}${isUrgent ? ' urgent' : ''}" data-ends-at="${escHtml(new Date(endsAt).toISOString())}" title="截止時間: ${escHtml(ts)}">⏳ ${text}</span>`;
+}
+
+function formatCountdown(ms) {
+  if (ms <= 0) return '已結束';
+  const total = Math.floor(ms / 1000);
+  const d = Math.floor(total / 86400);
+  const h = Math.floor((total % 86400) / 3600);
+  const m = Math.floor((total % 3600) / 60);
+  const s = total % 60;
+  const pad = (n) => String(n).padStart(2, '0');
+  if (d > 0) return `${d}天 ${pad(h)}:${pad(m)}:${pad(s)}`;
+  return `${pad(h)}:${pad(m)}:${pad(s)}`;
+}
+
+/* 全域 tick:每秒更新所有 .countdown-timer 文字;到 0 時 hide 並重載 catalog */
+let _countdownInterval = null;
+function startCountdownTicker() {
+  if (_countdownInterval) return;
+  _countdownInterval = setInterval(() => {
+    const els = document.querySelectorAll('.countdown-timer[data-ends-at]');
+    if (!els.length) return;
+    let needReload = false;
+    els.forEach((el) => {
+      const ms = new Date(el.dataset.endsAt).getTime() - Date.now();
+      if (ms <= 0) {
+        el.textContent = '⏳ 已結束';
+        el.classList.add('expired');
+        needReload = true;
+      } else {
+        el.textContent = '⏳ ' + formatCountdown(ms);
+        if (ms <= 3600 * 1000) el.classList.add('urgent');
+      }
+    });
+    if (needReload) {
+      // 至少 30 秒節流避免狂打 API
+      if (!_countdownInterval._lastReload || Date.now() - _countdownInterval._lastReload > 30000) {
+        _countdownInterval._lastReload = Date.now();
+        if (typeof reloadCatalog === 'function') reloadCatalog().catch(() => {});
+      }
+    }
+  }, 1000);
 }
 
 /* HTML / 屬性內 JS 字串跳脫 helper */
@@ -599,6 +657,7 @@ function renderProducts() {
     return `
     <article class="product-card${isOut ? ' is-out' : ''}" onclick="openProductModal('prod',${p.id})" style="cursor:pointer" tabindex="0" onkeydown="if(event.key==='Enter')openProductModal('prod',${p.id})">
       ${p.badge ? `<span class="product-badge ${p.badge}">${lbl[p.badge]}</span>` : ''}
+      ${countdownBadgeHtml(p.endsAt)}
       ${productMediaHtml(p)}
       <div class="product-info">
         <h5>${escHtml(p.name)}</h5>
@@ -669,6 +728,7 @@ function openProductModal(itemType, id) {
             ${p.orig ? `<span class="price-regular">NT$ ${p.orig}</span>` : ''}
           </div>
           ${p.description ? `<p class="pmd-desc">${escHtml(p.description)}</p>` : ''}
+          ${p.endsAt ? `<div class="pmd-countdown-wrap">${countdownBadgeHtml(p.endsAt, { size: 'lg' })}<span class="pmd-countdown-label">限時優惠倒數</span></div>` : ''}
           <div class="pmd-tags">
             ${p.type ? `<span class="pmd-tag">${escHtml(PET_LABEL[p.type] || p.type)}</span>` : ''}
             ${p.badge ? `<span class="pmd-tag ${p.badge}">${escHtml(BADGE_LABEL[p.badge] || p.badge)}</span>` : ''}
@@ -706,6 +766,7 @@ function openProductModal(itemType, id) {
             <span class="price-regular">NT$ ${orig}</span>
           </div>
           ${b.description ? `<p class="pmd-desc">${escHtml(b.description)}</p>` : ''}
+          ${b.endsAt ? `<div class="pmd-countdown-wrap">${countdownBadgeHtml(b.endsAt, { size: 'lg' })}<span class="pmd-countdown-label">限時優惠倒數</span></div>` : ''}
           <div class="pmd-bundle-items">
             <div class="pmd-items-label">包含商品</div>
             ${items.map(p => `
@@ -758,6 +819,7 @@ function renderBundleCard(b, isDealer) {
     <article class="product-card bundle-card ${isDealer ? 'dealer' : ''}${isOut ? ' is-out' : ''}" onclick="openProductModal('bundle',${b.id})" style="cursor:pointer" tabindex="0" onkeydown="if(event.key==='Enter')openProductModal('bundle',${b.id})">
       ${isDealer ? '<span class="bundle-vip-tag">VIP</span>' : ''}
       <span class="bundle-ribbon">${b.disc}% OFF</span>
+      ${countdownBadgeHtml(b.endsAt)}
       ${bundleImgHtml}
       <div class="product-info">
         <h5>${escHtml(b.name)}</h5>
@@ -836,6 +898,7 @@ function resetBundleForm() {
   document.getElementById('b-name').value = '';
   const imgEl = document.getElementById('b-imageUrl'); if (imgEl) imgEl.value = '';
   const descEl = document.getElementById('b-description'); if (descEl) descEl.value = '';
+  const endsEl = document.getElementById('b-endsAt'); if (endsEl) endsEl.value = '';
   document.getElementById('disc-slider').value = 15;
   selectedChips = [];
   currentVisibility = 'public';
@@ -853,8 +916,12 @@ async function saveBundle() {
   const tag = document.getElementById('b-tag').value;
   const imageUrl = document.getElementById('b-imageUrl')?.value.trim() || undefined;
   const description = document.getElementById('b-description')?.value.trim() || undefined;
+  // datetime-local 給的是「無時區字串」(2026-05-04T15:00),new Date() 會視為本地時間
+  // 後端用 ISO 字串再轉 Date,所以這邊轉 ISO 一致化
+  const endsAtRaw = document.getElementById('b-endsAt')?.value || '';
+  const endsAt = endsAtRaw ? new Date(endsAtRaw).toISOString() : null;
   try {
-    await Api.adminCreateBundle({ name, tag, imageUrl, description, items: selectedChips, disc, visibility: currentVisibility, active: true });
+    await Api.adminCreateBundle({ name, tag, imageUrl, description, items: selectedChips, disc, visibility: currentVisibility, active: true, endsAt });
     resetBundleForm();
     await reloadAdminLists();
     const v = currentVisibility === 'public' ? '🌐 公開' : '💼 經銷限定';
@@ -891,6 +958,7 @@ function renderBundleAdmin() {
     const orig = bundleOrig(b), final = bundleFinal(b);
     const items = b.items.map(getProduct).filter(Boolean);
     const visBadge = b.visibility === 'dealer' ? '<span class="bli-vis dealer">💼 經銷限定</span>' : '<span class="bli-vis public">🌐 公開</span>';
+    const endsAtInfo = adminScheduleInfoHtml(b.endsAt);
     return `
       <div class="bundle-list-item">
         <div class="status-dot ${b.active ? 'dot-on' : 'dot-off'}" title="${b.active ? '上架中' : '已下架'}"></div>
@@ -898,6 +966,7 @@ function renderBundleAdmin() {
         <div class="bli-info">
           <div class="bli-name">${b.name} ${visBadge} <span class="bli-tag">${b.tag || ''}</span></div>
           <div class="bli-sub">${items.map(p => p.name).join('、')}</div>
+          ${endsAtInfo}
         </div>
         <div class="bli-price-col">
           <div class="bli-final">NT$${final}</div>
@@ -905,11 +974,47 @@ function renderBundleAdmin() {
           <span class="bli-disc-badge">${b.disc}% OFF</span>
         </div>
         <div class="row-actions">
+          <button class="pill-btn" onclick="editBundleSchedule(${b.id})" title="編輯限時">⏳</button>
           <button class="pill-btn" onclick="toggleBundleActive(${b.id})">${b.active ? '下架' : '上架'}</button>
           <button class="pill-btn gray" onclick="deleteBundle(${b.id})">刪除</button>
         </div>
       </div>`;
   }).join('');
+}
+
+/* admin 列表中顯示限時資訊:倒數 / 已結束 / 永久 */
+function adminScheduleInfoHtml(endsAt) {
+  if (!endsAt) return '<div class="bli-schedule">⏱ 永久上架</div>';
+  const ms = new Date(endsAt).getTime() - Date.now();
+  const ts = new Date(endsAt).toLocaleString('zh-TW', { hour12: false });
+  if (ms <= 0) return `<div class="bli-schedule expired">⛔ 限時已結束 (${escHtml(ts)})</div>`;
+  return `<div class="bli-schedule">⏳ 限時截止: <code>${escHtml(ts)}</code> (還有 <span class="countdown-timer cd-sm" data-ends-at="${escHtml(new Date(endsAt).toISOString())}">${formatCountdown(ms)}</span>)</div>`;
+}
+
+/* admin 點 ⏳ 按鈕,prompt 簡易輸入新截止時間 */
+async function editBundleSchedule(bundleId) {
+  const b = BUNDLES.find(x => x.id === bundleId);
+  if (!b) return;
+  const current = b.endsAt
+    ? new Date(b.endsAt).toLocaleString('sv-SE').slice(0, 16).replace(' ', 'T')
+    : '';
+  const input = prompt(
+    `設定限時截止時間 (格式: YYYY-MM-DDTHH:mm)\n留空 = 永久上架`,
+    current
+  );
+  if (input === null) return; // 取消
+  const trimmed = input.trim();
+  let endsAt = null;
+  if (trimmed) {
+    const d = new Date(trimmed);
+    if (Number.isNaN(d.getTime())) { showToast('日期格式錯誤', false); return; }
+    endsAt = d.toISOString();
+  }
+  try {
+    await Api.adminUpdateBundle(bundleId, { endsAt });
+    await reloadAdminLists();
+    showToast(endsAt ? '✓ 限時時間已更新' : '✓ 已改為永久上架', true);
+  } catch (e) { showToast('更新失敗: ' + e.message, false); }
 }
 
 /* ============================ ADMIN: ADDON ============================ */
@@ -2131,6 +2236,10 @@ function renderStockList() {
     const status = stock === 0 ? 'out' : (stock <= threshold ? 'low' : 'ok');
     const badge = stockBadgeHtml(stock, threshold, item.trackStock);
     const idAttr = type === 'addon' ? `data-addon-id="${item.id}"` : `data-product-id="${item.id}"`;
+    // datetime-local 接受 YYYY-MM-DDTHH:mm,用 sv-SE locale 取得 ISO-like 但是本地時間
+    const endsAtLocal = type === 'product' && item.endsAt
+      ? new Date(item.endsAt).toLocaleString('sv-SE').slice(0, 16).replace(' ', 'T')
+      : '';
     const metaPanel = type === 'product' ? `
         <div class="prod-meta-edit" id="meta-${item.id}" style="display:none;grid-column:1/-1;padding:10px 14px;background:#fafafa;border-top:1px dashed var(--border);">
           <div style="display:grid;gap:8px;">
@@ -2139,6 +2248,9 @@ function renderStockList() {
             </label>
             <label style="font-size:12px;color:var(--text-light)">描述
               <textarea class="meta-description" rows="2" placeholder="商品介紹" style="width:100%;padding:6px;border:1px solid var(--border);border-radius:4px;font:inherit;resize:vertical">${escHtml(item.description || '')}</textarea>
+            </label>
+            <label style="font-size:12px;color:var(--text-light)">⏳ 限時截止 <span style="color:var(--text-light);font-weight:500">(留空 = 永久)</span>
+              <input type="datetime-local" class="meta-endsAt" value="${escHtml(endsAtLocal)}" style="width:100%;padding:6px;border:1px solid var(--border);border-radius:4px;font:inherit">
             </label>
             <div style="text-align:right">
               <button class="pill-btn green" onclick="saveProductMeta(${item.id})">儲存</button>
@@ -2182,8 +2294,11 @@ async function saveProductMeta(productId) {
   if (!panel) return;
   const imageUrl = panel.querySelector('.meta-imageUrl').value.trim();
   const description = panel.querySelector('.meta-description').value.trim();
+  const endsAtRaw = panel.querySelector('.meta-endsAt')?.value || '';
+  // 空值送 null 給後端清除限時;有值轉 ISO 字串
+  const endsAt = endsAtRaw ? new Date(endsAtRaw).toISOString() : null;
   try {
-    await Api.adminUpdateProduct(productId, { imageUrl, description });
+    await Api.adminUpdateProduct(productId, { imageUrl, description, endsAt });
     showToast('✓ 商品資訊已更新', true);
     await loadStockList();
     reloadCatalog();
@@ -2276,6 +2391,7 @@ async function init() {
   updateRolePill();
   renderCart();
   handlePaymentRedirect();
+  startCountdownTicker();
   hideLoading();
   // 套用 URL hash 路由（例如直接進到 #/cat/dog）
   applyHashRoute();
