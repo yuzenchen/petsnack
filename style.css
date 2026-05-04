@@ -116,6 +116,21 @@ body.role-admin .nav-links button.admin-only{display:inline-block}
 }
 .ship-opt:hover{border-color:var(--primary-light);background:var(--bg)}
 .ship-opt.active{border-color:var(--primary);background:var(--primary-light);color:var(--primary-dark)}
+
+/* PAYMENT METHOD TOGGLE (LINE Pay / 銀行轉帳) */
+.payment-toggle{display:flex;gap:8px;margin-top:6px}
+.pay-opt{
+  flex:1;padding:12px 10px;border:1.5px solid var(--border);background:var(--white);
+  color:var(--text);font-size:13px;font-weight:600;border-radius:8px;
+  cursor:pointer;transition:all .2s;display:flex;flex-direction:column;
+  align-items:center;gap:2px;line-height:1.3;
+}
+.pay-opt:hover{border-color:var(--primary-light);background:var(--bg)}
+.pay-opt.active{border-color:var(--primary);background:var(--primary-light);color:var(--primary-dark)}
+.pay-opt-icon{font-size:22px;line-height:1;margin-bottom:2px}
+.pay-opt-label{font-size:13px;font-weight:700}
+.pay-opt-sub{font-size:10px;color:var(--text-light);font-weight:500}
+.pay-opt.active .pay-opt-sub{color:var(--primary-dark);opacity:.85}
 .cvstore-display{
   padding:10px 12px;background:var(--bg);border-radius:8px;
   font-size:13px;color:var(--text);margin-bottom:8px;border:1px dashed var(--border);
@@ -1208,6 +1223,33 @@ body.role-admin .bnav-btn.admin-only{display:flex}
   text-align:center;font-size:11px;color:var(--text-light);
   margin-top:12px;line-height:1.6;
 }
+
+/* 銀行轉帳資訊框 */
+.occ-bank-block{
+  background:#FFF8E7;border:1px solid #F0D9B5;
+  border-radius:var(--radius-md);padding:14px;margin-bottom:12px;
+}
+.occ-bank-block .occ-section-label{color:#8B6914}
+.occ-bank-row{
+  display:flex;justify-content:space-between;align-items:center;
+  font-size:13px;padding:6px 0;border-bottom:1px dashed rgba(186,117,23,0.15);gap:10px;
+}
+.occ-bank-row:last-of-type{border-bottom:none}
+.occ-bank-row span:first-child{color:var(--text-light);min-width:60px}
+.occ-bank-acc{font-size:15px !important;letter-spacing:1.5px !important}
+.occ-bank-copy{margin-top:10px;width:100%;padding:8px}
+.occ-bank-tips{
+  background:var(--bg);border-left:3px solid var(--am, #E8A95F);
+  padding:10px 12px;font-size:12px;line-height:1.7;color:var(--text);
+  border-radius:0 6px 6px 0;margin-bottom:12px;
+}
+/* 訂單查詢時的「尚未收款」警示 */
+.occ-bank-pending{
+  background:#FFF3E0;border:1.5px dashed #E8A95F;
+  border-radius:var(--radius-md);padding:12px 14px;margin-bottom:12px;
+  text-align:center;color:var(--text);
+}
+.occ-bank-pending strong{color:#B8650F;font-size:14px}
 
 /* ============================
    ORDER LOOKUP (empty cart)

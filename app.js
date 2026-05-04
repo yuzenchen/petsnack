@@ -1172,6 +1172,8 @@ function openCheckoutModal() {
 
   // 預設配送方式 = 宅配 (除非剛從選店 callback 回來,handleCvStoreReturn 會在 modal 開好後 override)
   setShippingMethod(_selectedCvStore ? 'convenience_store' : 'home_delivery');
+  // 預設付款方式 = LINE Pay
+  setPaymentMethod('linepay');
   if (!_selectedCvStore) {
     const display = document.getElementById('co-cvstore-display');
     if (display) {
@@ -1194,6 +1196,26 @@ function closeCheckoutModal() {
 /* ============================ SHIPPING METHOD ============================ */
 let _checkoutShippingMethod = 'home_delivery';
 let _selectedCvStore = null;  // { cvStoreId, cvStoreName, cvAddress }
+let _checkoutPaymentMethod = 'linepay';
+
+function setPaymentMethod(method) {
+  _checkoutPaymentMethod = method;
+  document.querySelectorAll('.pay-opt').forEach(b => {
+    const on = b.dataset.method === method;
+    b.classList.toggle('active', on);
+    b.setAttribute('aria-checked', on ? 'true' : 'false');
+  });
+  // 動態更新底下「跳轉至 LINE Pay」說明文字 + 按鈕文字
+  const sub = document.querySelector('#checkout-modal .modal-sub');
+  const btn = document.getElementById('co-submit');
+  if (method === 'bank_transfer') {
+    if (sub) sub.textContent = '請填寫收件資料,完成後將顯示銀行帳號供轉帳';
+    if (btn) btn.textContent = '產生轉帳資訊 →';
+  } else {
+    if (sub) sub.textContent = '請填寫收件資料,完成後將跳轉至 LINE Pay';
+    if (btn) btn.textContent = '確認結帳 →';
+  }
+}
 
 function setShippingMethod(method) {
   _checkoutShippingMethod = method;
@@ -1327,6 +1349,7 @@ async function confirmCheckout() {
     orderType: 'general',
     customer: { name, phone, ...(email ? { email } : {}) },
     shippingMethod: _checkoutShippingMethod,
+    paymentMethod: _checkoutPaymentMethod,
     shippingInfo: isCvs
       ? { cvStoreId: _selectedCvStore.cvStoreId, cvStoreName: _selectedCvStore.cvStoreName }
       : { address },
@@ -1339,7 +1362,13 @@ async function confirmCheckout() {
     const result = await Api.checkout(payload);
     // 結帳送出後清掉已選門市,避免下次開 modal 還記得舊的
     _selectedCvStore = null;
-    if (result.paymentUrl) {
+
+    if (result.paymentMethod === 'bank_transfer' && result.bankInfo) {
+      // 銀行轉帳:顯示帳號資訊 modal,清空購物車
+      closeCheckoutModal();
+      cart = {}; saveCart(); updateCartBadge(); renderCart();
+      openBankTransferModal(result.orderId, result.bankInfo);
+    } else if (result.paymentUrl) {
       showToast('正在跳轉到 LINE Pay...', true);
       closeCheckoutModal();
       setTimeout(() => { window.location.href = result.paymentUrl; }, 600);
@@ -1350,7 +1379,79 @@ async function confirmCheckout() {
     }
   } catch (e) {
     errEl.textContent = '⚠ ' + (e.message || '結帳失敗');
-    if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = '確認結帳 →'; }
+    if (submitBtn) {
+      submitBtn.disabled = false;
+      submitBtn.textContent = _checkoutPaymentMethod === 'bank_transfer' ? '產生轉帳資訊 →' : '確認結帳 →';
+    }
+  }
+}
+
+/* ============================ BANK TRANSFER MODAL ============================ */
+/* 顯示銀行帳號 + 訂單金額 + 期限。重用既有的 order-confirm-modal,動態填內容。 */
+function openBankTransferModal(orderId, bankInfo) {
+  const modal = document.getElementById('order-confirm-modal');
+  const body = document.getElementById('order-confirm-body');
+  if (!modal || !body) return;
+  const orderIdEnc = encodeURIComponent(orderId);
+  const expireText = bankInfo.expireAt
+    ? new Date(bankInfo.expireAt).toLocaleString('zh-TW', { hour12: false })
+    : `${bankInfo.expireHours || 24} 小時內`;
+  body.innerHTML = `
+    <div class="occ-header">
+      <div class="occ-icon">🏦</div>
+      <h3 id="order-confirm-title">請完成銀行轉帳</h3>
+      <p class="modal-sub">訂單已建立,請於 ${escHtml(String(bankInfo.expireHours || 24))} 小時內完成轉帳</p>
+    </div>
+    <div class="occ-order-no">訂單編號:<code>${escHtml(orderId)}</code></div>
+    <div class="occ-bank-block">
+      <div class="occ-section-label">💳 轉帳資訊</div>
+      <div class="occ-bank-row"><span>收款銀行</span><strong>${escHtml(bankInfo.bankName)}</strong></div>
+      <div class="occ-bank-row"><span>戶名</span><strong>${escHtml(bankInfo.accountHolder)}</strong></div>
+      <div class="occ-bank-row">
+        <span>帳號</span>
+        <code class="occ-code occ-bank-acc" id="occ-bank-acc">${escHtml(bankInfo.accountNo)}</code>
+      </div>
+      <div class="occ-bank-row">
+        <span>金額</span>
+        <strong style="color:var(--sale);font-size:18px">NT$${(bankInfo.amount || 0).toLocaleString()}</strong>
+      </div>
+      <button class="modal-btn outline occ-bank-copy" onclick="copyBankAccount('${escAttrJs(bankInfo.accountNo)}')">
+        📋 複製帳號
+      </button>
+    </div>
+    <div class="occ-bank-tips">
+      ⚠ 請於 <strong>${escHtml(expireText)}</strong> 前完成轉帳<br>
+      ⚠ 轉帳後我們會在 1-2 個工作日內人工確認,確認後會更新訂單狀態<br>
+      ⚠ 請保留訂單編號,有問題請洽客服
+    </div>
+    <div class="occ-cta-row">
+      <button class="modal-btn outline" onclick="reopenOrderLookup('${orderIdEnc}')">🔍 之後查詢狀態</button>
+      <button class="modal-btn primary" onclick="closeOrderConfirmModal();switchPage('shop')">繼續購物 →</button>
+    </div>
+    <div class="occ-help-line">有任何問題?請洽客服 📞 0800-123-456 / ✉️ hello@petsnack.tw</div>`;
+  modal.classList.add('active');
+  modal.setAttribute('aria-hidden', 'false');
+}
+
+/* 訂單查詢時點「查看轉帳資訊」— 用 Api.bankInfo() 拿銀行帳號再開 modal */
+async function showBankInfoForOrder(orderIdEnc, amount) {
+  const orderId = decodeURIComponent(orderIdEnc);
+  try {
+    const { bankInfo } = await Api.bankInfo();
+    openBankTransferModal(orderId, { ...bankInfo, amount });
+  } catch (e) {
+    showToast('無法取得銀行資訊: ' + (e.message || ''), false);
+  }
+}
+
+function copyBankAccount(acc) {
+  if (navigator.clipboard?.writeText) {
+    navigator.clipboard.writeText(acc).then(
+      () => showToast('✓ 帳號已複製', true),
+      () => showToast(`帳號:${acc}`, true)
+    );
+  } else {
+    showToast(`帳號:${acc}`, true);
   }
 }
 
@@ -1507,6 +1608,18 @@ function renderOrderConfirmContent(o, isLookup) {
     dealer_logistics:  '💼 依出貨單排程配送',
   }[o.shippingMethod];
 
+  /* --- 轉帳未付款警示 --- */
+  const isPendingBankTransfer = o.payment?.method === 'bank_transfer' && o.payment?.status === 'pending';
+  const bankPendingBlock = isPendingBankTransfer ? `
+    <div class="occ-bank-pending">
+      <strong>⏳ 尚未收到款項</strong>
+      <div style="font-size:12px;margin-top:4px;color:var(--text-light)">完成銀行轉帳後,我們會在 1-2 個工作日內人工確認</div>
+      <button class="modal-btn outline" style="margin-top:10px"
+              onclick="showBankInfoForOrder('${encodeURIComponent(o.orderId)}', ${o.totalAmount || 0})">
+        查看轉帳資訊
+      </button>
+    </div>` : '';
+
   /* --- 超商取貨資訊 (寄件代碼 + 驗證碼,給客戶取貨用) --- */
   const cvsBlock = (o.shippingMethod === 'convenience_store') ? `
     <div class="occ-shipping occ-cvs-block">
@@ -1540,6 +1653,7 @@ function renderOrderConfirmContent(o, isLookup) {
   return `
     ${header}
     <div class="occ-order-no">訂單編號:<code>${escHtml(o.orderId)}</code></div>
+    ${bankPendingBlock}
     ${etaText && !isLookup ? `<div class="occ-eta">${etaText}</div>` : ''}
     ${items ? `<div class="occ-items-section">
       <div class="occ-section-label">訂購品項</div>
@@ -1822,6 +1936,9 @@ function renderOrderDetail(o) {
       </div>` : ''}
 
       <div class="od-actions">
+        ${o.payment?.method === 'bank_transfer' && o.payment?.status === 'pending'
+          ? `<button class="pill-btn green" onclick="adminMarkPaid('${encodeURIComponent(o.orderId)}')">💰 標記已收款 (轉帳)</button>`
+          : ''}
         ${next ? `<button class="pill-btn green" onclick="advanceOrderStatus('${encodeURIComponent(o.orderId)}','${next}')">→ 標記為「${STATUS_LABEL[next]}」</button>` : ''}
         ${o.status !== 'cancelled' ? `<button class="pill-btn gray" onclick="advanceOrderStatus('${encodeURIComponent(o.orderId)}','cancelled')">取消訂單</button>` : ''}
         ${canRefund ? `<button class="pill-btn" style="background:var(--red-light);color:var(--red)" onclick="refundOrder('${encodeURIComponent(o.orderId)}')">💸 退款</button>` : ''}
@@ -1851,6 +1968,20 @@ const _SHIPPING_METHOD_LABEL = {
 };
 function shippingMethodLabel(m) {
   return _SHIPPING_METHOD_LABEL[m] || m || '-';
+}
+
+async function adminMarkPaid(orderIdEnc) {
+  const orderId = decodeURIComponent(orderIdEnc);
+  if (!confirm(`確定已收到訂單 ${orderId} 的轉帳款項?\n標記後若是超商取貨,會自動建立 ECPay 物流單`)) return;
+  try {
+    await Api.adminMarkPaid(orderId);
+    showToast('✓ 訂單已標記為已收款', true);
+    openOrderModal(orderIdEnc);
+    loadOrders();
+    loadDashboardStats();
+  } catch (e) {
+    showToast('標記失敗: ' + (e.message || ''), false);
+  }
 }
 
 async function adminBuildLogistics(orderIdEnc) {

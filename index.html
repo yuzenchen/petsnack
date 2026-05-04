@@ -512,6 +512,23 @@
       <label for="co-email">Email <span style="color:var(--text-light);font-weight:500">(選填,訂單通知)</span></label>
       <input type="email" id="co-email" autocomplete="email" placeholder="you@example.com">
     </div>
+    <div class="modal-field">
+      <label>付款方式 <span style="color:var(--sale)">*</span></label>
+      <div class="payment-toggle" role="radiogroup" aria-label="付款方式">
+        <button type="button" class="pay-opt active" data-method="linepay"
+                role="radio" aria-checked="true" onclick="setPaymentMethod('linepay')">
+          <span class="pay-opt-icon" aria-hidden="true">💚</span>
+          <span class="pay-opt-label">LINE Pay</span>
+          <span class="pay-opt-sub">安全快速</span>
+        </button>
+        <button type="button" class="pay-opt" data-method="bank_transfer"
+                role="radio" aria-checked="false" onclick="setPaymentMethod('bank_transfer')">
+          <span class="pay-opt-icon" aria-hidden="true">🏦</span>
+          <span class="pay-opt-label">銀行轉帳</span>
+          <span class="pay-opt-sub">24h 內完成</span>
+        </button>
+      </div>
+    </div>
     <div id="checkout-error" role="alert" aria-live="assertive" style="min-height:20px;color:var(--red);font-size:12px;font-weight:700;margin-bottom:8px"></div>
     <div class="modal-actions">
       <button class="modal-btn primary" id="co-submit" onclick="confirmCheckout()">確認結帳 →</button>

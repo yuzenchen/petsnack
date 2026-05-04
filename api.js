@@ -104,6 +104,11 @@
       return this._fetch('/logistics/ecpay/map-form' + (mobile ? '?mobile=1' : ''));
     },
 
+    /* ---------- 銀行轉帳資訊 (公開) ---------- */
+    bankInfo() {
+      return this._fetch('/payments/bank-info');
+    },
+
     /* ---------- Admin: Bundles ---------- */
     adminListBundles() {
       return this._fetch('/admin/bundles');
@@ -200,6 +205,12 @@
     },
     adminCreateEcpayLogistics(orderId) {
       return this._fetch('/admin/orders/' + encodeURIComponent(orderId) + '/logistics/ecpay', {
+        method: 'POST',
+        body: JSON.stringify({}),
+      });
+    },
+    adminMarkPaid(orderId) {
+      return this._fetch('/admin/orders/' + encodeURIComponent(orderId) + '/mark-paid', {
         method: 'POST',
         body: JSON.stringify({}),
       });
