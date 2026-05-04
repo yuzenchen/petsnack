@@ -710,6 +710,30 @@ input:focus,select:focus,textarea:focus{border-color:var(--primary);box-shadow:0
 .stat-value{font-family:'Playfair Display',serif;font-size:24px;font-weight:700;color:var(--primary)}
 .stat-label{font-size:12px;color:var(--text-light);font-weight:500;margin-top:2px}
 
+/* 可點擊的 dashboard 統計卡 */
+.stat-card.stat-clickable{
+  cursor:pointer;transition:transform .2s ease, box-shadow .2s ease, border-color .2s ease;
+}
+.stat-card.stat-clickable:hover{
+  transform:translateY(-2px);
+  box-shadow:var(--shadow-md);
+  border-color:var(--primary-light);
+}
+.stat-card.stat-clickable:focus-visible{
+  outline:2px solid var(--primary);outline-offset:2px;
+}
+.stat-card.stat-clickable:active{transform:translateY(0)}
+
+/* 跳轉時高亮目標區塊 1.2 秒,讓使用者看清楚 */
+.dash-jump-flash{
+  animation:dashFlash 1.2s ease;
+}
+@keyframes dashFlash{
+  0%   { box-shadow:0 0 0 0 rgba(216,129,102,0.6); }
+  50%  { box-shadow:0 0 0 6px rgba(216,129,102,0.15); }
+  100% { box-shadow:var(--shadow-sm); }
+}
+
 .admin-card{
   max-width:1160px;width:calc(100% - 40px);
   margin:0 auto 22px;

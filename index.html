@@ -272,13 +272,46 @@
 <div id="page-admin" class="page">
   <div class="section-title"><h3>Dashboard<span class="zh">營運總覽</span></h3></div>
   <div class="admin-stats">
-    <div class="stat-card"><div class="stat-emoji">📦</div><div class="stat-value" id="stat-prod">8</div><div class="stat-label">上架商品</div></div>
-    <div class="stat-card"><div class="stat-emoji">🎁</div><div class="stat-value" id="stat-bundle">0</div><div class="stat-label">公開組合</div></div>
-    <div class="stat-card"><div class="stat-emoji">💼</div><div class="stat-value" id="stat-dealer">0</div><div class="stat-label">經銷組合</div></div>
-    <div class="stat-card"><div class="stat-emoji">🎀</div><div class="stat-value" id="stat-addon">0</div><div class="stat-label">加價購</div></div>
-    <div class="stat-card"><div class="stat-emoji">💰</div><div class="stat-value" id="stat-revenue">—</div><div class="stat-label">本月營收</div></div>
-    <div class="stat-card"><div class="stat-emoji">📦</div><div class="stat-value" id="stat-pending">—</div><div class="stat-label">待出貨</div></div>
-    <div class="stat-card stat-warning" id="stat-lowstock-card" style="cursor:pointer" onclick="document.getElementById('stock-admin-card').scrollIntoView({behavior:'smooth'})" title="點擊查看低庫存商品">
+    <div class="stat-card stat-clickable" tabindex="0" role="button"
+         onclick="dashJump('stock')"
+         onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();dashJump('stock')}"
+         title="點擊查看商品庫存">
+      <div class="stat-emoji">📦</div><div class="stat-value" id="stat-prod">8</div><div class="stat-label">上架商品</div>
+    </div>
+    <div class="stat-card stat-clickable" tabindex="0" role="button"
+         onclick="dashJump('bundle')"
+         onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();dashJump('bundle')}"
+         title="點擊查看組合包">
+      <div class="stat-emoji">🎁</div><div class="stat-value" id="stat-bundle">0</div><div class="stat-label">公開組合</div>
+    </div>
+    <div class="stat-card stat-clickable" tabindex="0" role="button"
+         onclick="dashJump('bundle')"
+         onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();dashJump('bundle')}"
+         title="點擊查看組合包">
+      <div class="stat-emoji">💼</div><div class="stat-value" id="stat-dealer">0</div><div class="stat-label">經銷組合</div>
+    </div>
+    <div class="stat-card stat-clickable" tabindex="0" role="button"
+         onclick="dashJump('addon')"
+         onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();dashJump('addon')}"
+         title="點擊查看加價購">
+      <div class="stat-emoji">🎀</div><div class="stat-value" id="stat-addon">0</div><div class="stat-label">加價購</div>
+    </div>
+    <div class="stat-card stat-clickable" tabindex="0" role="button"
+         onclick="dashJump('revenue')"
+         onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();dashJump('revenue')}"
+         title="點擊查看本月已付款訂單">
+      <div class="stat-emoji">💰</div><div class="stat-value" id="stat-revenue">—</div><div class="stat-label">本月營收</div>
+    </div>
+    <div class="stat-card stat-clickable" tabindex="0" role="button"
+         onclick="dashJump('pending')"
+         onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();dashJump('pending')}"
+         title="點擊查看待出貨訂單">
+      <div class="stat-emoji">📦</div><div class="stat-value" id="stat-pending">—</div><div class="stat-label">待出貨</div>
+    </div>
+    <div class="stat-card stat-warning stat-clickable" id="stat-lowstock-card" tabindex="0" role="button"
+         onclick="dashJump('lowstock')"
+         onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();dashJump('lowstock')}"
+         title="點擊查看低庫存商品">
       <div class="stat-emoji">⚠️</div><div class="stat-value" id="stat-lowstock">—</div><div class="stat-label">低庫存警示</div>
     </div>
   </div>
@@ -346,7 +379,7 @@
   </div>
 
   <!-- 現有組合包 -->
-  <div class="admin-card">
+  <div class="admin-card" id="bundle-admin-card">
     <div class="admin-card-hd"><h3>📋 現有組合包</h3></div>
     <div id="bundle-admin-list"></div>
   </div>
@@ -368,7 +401,7 @@
   </div>
 
   <!-- 加價購管理 -->
-  <div class="admin-card">
+  <div class="admin-card" id="addon-admin-card">
     <div class="admin-card-hd"><h3>🎁 加價購管理</h3><span class="admin-hint">結帳前限定，最多 8 件</span></div>
     <div class="form-grid">
       <div><label for="ad-name">商品名稱</label><input type="text" id="ad-name" placeholder="例：雞肉小肉乾片"></div>
@@ -384,7 +417,7 @@
   </div>
 
   <!-- 訂單管理 -->
-  <div class="admin-card">
+  <div class="admin-card" id="order-admin-card">
     <div class="admin-card-hd">
       <h3>🧾 訂單管理</h3>
       <button class="pill-btn" onclick="exportOrdersCSV()" title="匯出當前篩選結果為 CSV">📥 匯出 CSV</button>

@@ -716,6 +716,43 @@ async function reloadCatalog() {
   }
 }
 
+/* Dashboard 統計卡點擊 → 捲到對應功能區塊 (有需要的話順便預設篩選) */
+function dashJump(target) {
+  const map = {
+    stock:    'stock-admin-card',     // 上架商品 / 低庫存
+    lowstock: 'stock-admin-card',
+    bundle:   'bundle-admin-card',    // 公開 / 經銷組合
+    addon:    'addon-admin-card',
+    revenue:  'order-admin-card',     // 本月營收 → 訂單列表
+    pending:  'order-admin-card',     // 待出貨 → 訂單列表 + 預設 status=paid
+  };
+  const id = map[target];
+  const el = id ? document.getElementById(id) : null;
+  if (!el) return;
+
+  // 待出貨 → 自動把訂單篩選器設成 status=paid
+  if (target === 'pending') {
+    const sel = document.getElementById('order-filter-status');
+    if (sel) {
+      sel.value = 'paid';
+      if (typeof onOrderFilterChange === 'function') onOrderFilterChange();
+    }
+  }
+  // 低庫存 → 自動勾「只看低庫存」
+  if (target === 'lowstock') {
+    const cb = document.getElementById('stock-show-low-only');
+    if (cb && !cb.checked) {
+      cb.checked = true;
+      if (typeof renderStockList === 'function') renderStockList();
+    }
+  }
+
+  el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  // 短暫高亮提示視覺對焦
+  el.classList.add('dash-jump-flash');
+  setTimeout(() => el.classList.remove('dash-jump-flash'), 1200);
+}
+
 async function reloadAdminLists() {
   if (!currentUser || currentUser.role !== 'admin') return;
   try {
