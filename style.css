@@ -538,6 +538,16 @@ input:focus,select:focus,textarea:focus{border-color:var(--primary);box-shadow:0
   transition:all .3s;letter-spacing:1px;
 }
 .checkout-btn:hover{background:var(--primary-dark);transform:translateY(-1px);box-shadow:var(--shadow-md)}
+
+/* 手機版:結帳按鈕 sticky 在底部導覽列上方,確保長購物車也能立即看到 CTA */
+@media(max-width:899px){
+  .cart-summary .checkout-btn{
+    position:sticky;
+    bottom:calc(60px + env(safe-area-inset-bottom, 0px) + 8px); /* 60px ≈ bottom-nav 高度 */
+    z-index:30;
+    box-shadow:0 4px 16px rgba(216,129,102,0.35), 0 -2px 12px rgba(0,0,0,0.08);
+  }
+}
 .back-shop-btn{
   padding:11px 28px;border-radius:30px;border:none;background:var(--primary);color:#fff;
   font-size:14px;font-weight:500;transition:all .25s;
@@ -724,6 +734,22 @@ footer{background:var(--white);border-top:1px solid var(--border);padding:50px 2
 .footer-col p{font-size:13px;color:var(--text-light);line-height:1.7;margin-bottom:14px}
 .footer-pay{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
 .footer-pay span{background:var(--bg);border:1px solid var(--border);font-size:10px;font-weight:700;color:var(--text);padding:4px 8px;border-radius:5px;letter-spacing:1px}
+
+/* 訂單查詢區塊 (footer 內) */
+.footer-lookup{margin-top:14px}
+.footer-lookup-row{display:flex;gap:6px;margin-top:6px}
+.footer-lookup-row input{
+  flex:1;min-width:0;padding:8px 10px;border:1px solid var(--border);
+  border-radius:6px;font-size:12px;font-family:inherit;background:var(--white);
+}
+.footer-lookup-row input:focus{outline:none;border-color:var(--primary)}
+.footer-lookup-btn{
+  padding:8px 14px;border:none;border-radius:6px;
+  background:var(--primary);color:#fff;font-size:12px;font-weight:700;
+  cursor:pointer;transition:background .2s;white-space:nowrap;
+}
+.footer-lookup-btn:hover{background:var(--primary-dark)}
+.footer-lookup-err{min-height:16px;font-size:11px;color:var(--red);margin-top:4px;font-weight:700}
 .footer-bottom{
   max-width:1200px;margin:0 auto;text-align:center;padding-top:18px;
   border-top:1px solid var(--border);color:var(--text-light);font-size:12px;
@@ -1148,9 +1174,40 @@ body.role-admin .bnav-btn.admin-only{display:flex}
 }
 .occ-shipping{
   background:var(--bg);border-radius:var(--radius-md);
-  padding:12px 14px;margin-bottom:16px;font-size:13px;
+  padding:12px 14px;margin-bottom:12px;font-size:13px;
 }
 .occ-addr-row{color:var(--text);font-weight:500;margin-top:4px}
+
+/* 預計到貨資訊 */
+.occ-eta{
+  background:linear-gradient(135deg, #FFF6F0 0%, #FFFCF6 100%);
+  border:1px solid var(--am-light, #F0D9B5);
+  border-radius:var(--radius-md);padding:10px 14px;
+  font-size:13px;color:var(--text);font-weight:500;
+  margin-bottom:14px;line-height:1.5;
+}
+/* 超商取貨資訊強調框 */
+.occ-cvs-block{
+  background:#F0F7F0;border:1px dashed #8FBC8F;
+}
+.occ-cvs-block .occ-section-label{color:#3a6b3a}
+.occ-code{
+  font-family:'Courier New',monospace;font-weight:700;
+  background:var(--white);padding:2px 8px;border-radius:4px;
+  font-size:13px;color:var(--text);letter-spacing:1px;
+}
+/* 訂單成功 CTA 雙按鈕 */
+.occ-cta-row{
+  display:flex;gap:10px;margin-top:6px;
+}
+.occ-cta-row .modal-btn{flex:1;margin-top:0}
+@media(max-width:480px){
+  .occ-cta-row{flex-direction:column;gap:8px}
+}
+.occ-help-line{
+  text-align:center;font-size:11px;color:var(--text-light);
+  margin-top:12px;line-height:1.6;
+}
 
 /* ============================
    ORDER LOOKUP (empty cart)

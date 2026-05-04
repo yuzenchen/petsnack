@@ -1428,9 +1428,12 @@ const ORDER_STATUS_ZH = {
   shipped: '已出貨', delivered: '已送達', cancelled: '已取消',
 };
 
-function lookupOrder() {
-  const input = document.getElementById('order-lookup-input');
-  const errEl = document.getElementById('order-lookup-error');
+function lookupOrder(inputId, errId) {
+  // 預設用購物車空狀態的 ID;footer 查詢用 'footer-order-lookup-input' / 'footer-order-lookup-error'
+  inputId = inputId || 'order-lookup-input';
+  errId = errId || 'order-lookup-error';
+  const input = document.getElementById(inputId);
+  const errEl = document.getElementById(errId);
   if (!input) return;
   const orderId = input.value.trim();
   if (!orderId) { if (errEl) errEl.textContent = '⚠ 請輸入訂單編號'; return; }
@@ -1481,7 +1484,7 @@ function renderOrderConfirmContent(o, isLookup) {
   const statusCls = STATUS_CLASS[o.status] || 's-pend';
   const items = (o.items || []).map(i => `
     <div class="occ-item">
-      <span class="occ-item-name">${i.name || '-'}</span>
+      <span class="occ-item-name">${escHtml(i.name || '-')}</span>
       <span class="occ-item-qty">×${i.qty}</span>
       <span class="occ-item-price">NT$${((i.price || 0) * i.qty).toLocaleString()}</span>
     </div>`).join('');
@@ -1494,10 +1497,50 @@ function renderOrderConfirmContent(o, isLookup) {
     : `<div class="occ-header">
          <div class="occ-icon">✅</div>
          <h3 id="order-confirm-title">感謝您的訂購！</h3>
+         <p class="modal-sub">我們已收到您的訂單,以下是訂單明細</p>
        </div>`;
+
+  /* --- 預計到貨資訊 (依配送方式) --- */
+  const etaText = {
+    convenience_store: '📦 預計 2–3 個工作日寄達門市,到店後 7-11 會發簡訊通知',
+    home_delivery:     '🚚 預計 2–3 個工作日內出貨',
+    dealer_logistics:  '💼 依出貨單排程配送',
+  }[o.shippingMethod];
+
+  /* --- 超商取貨資訊 (寄件代碼 + 驗證碼,給客戶取貨用) --- */
+  const cvsBlock = (o.shippingMethod === 'convenience_store') ? `
+    <div class="occ-shipping occ-cvs-block">
+      <div class="occ-section-label">🏪 取貨資訊</div>
+      ${o.shippingInfo?.cvStoreName ? `<div class="occ-addr-row">門市:${escHtml(o.shippingInfo.cvStoreName)}${o.shippingInfo?.cvStoreId ? ` <code style="font-size:11px;color:var(--text-light)">(${escHtml(o.shippingInfo.cvStoreId)})</code>` : ''}</div>` : ''}
+      ${o.shippingInfo?.cvsPaymentNo ? `<div class="occ-addr-row">寄件代碼:<code class="occ-code">${escHtml(o.shippingInfo.cvsPaymentNo)}</code></div>` : ''}
+      ${o.shippingInfo?.cvsValidationNo ? `<div class="occ-addr-row">取貨驗證碼:<code class="occ-code">${escHtml(o.shippingInfo.cvsValidationNo)}</code> <span style="font-size:11px;color:var(--text-light)">(取貨時出示)</span></div>` : ''}
+      ${(!o.shippingInfo?.cvsPaymentNo && !o.shippingInfo?.cvsValidationNo) ? `<div class="occ-addr-row" style="color:var(--text-light);font-size:12px">物流單建立中,稍後再查可看到取貨碼</div>` : ''}
+    </div>` : '';
+
+  /* --- 收件人資訊 --- */
+  const recipientBlock = (o.customer?.name || o.customer?.phone || o.shippingInfo?.address) ? `
+    <div class="occ-shipping">
+      <div class="occ-section-label">收件資訊</div>
+      ${o.shippingMethod ? `<div class="occ-addr-row">${shippingMethodLabel(o.shippingMethod)}</div>` : ''}
+      ${o.customer?.name ? `<div class="occ-addr-row">👤 ${escHtml(o.customer.name)}</div>` : ''}
+      ${o.customer?.phone ? `<div class="occ-addr-row">📞 ${escHtml(o.customer.phone)}</div>` : ''}
+      ${o.shippingInfo?.address ? `<div class="occ-addr-row">📍 ${escHtml(o.shippingInfo.address)}</div>` : ''}
+    </div>` : '';
+
+  /* --- CTA 區 --- */
+  const orderIdEnc = encodeURIComponent(o.orderId);
+  const ctaBlock = isLookup
+    ? `<button class="modal-btn primary" onclick="closeOrderConfirmModal();switchPage('shop')">繼續購物 →</button>`
+    : `<div class="occ-cta-row">
+         <button class="modal-btn outline" onclick="reopenOrderLookup('${orderIdEnc}')">🔍 隨時查詢狀態</button>
+         <button class="modal-btn primary" onclick="closeOrderConfirmModal();switchPage('shop')">繼續購物 →</button>
+       </div>
+       <div class="occ-help-line">有任何問題?請洽客服 📞 0800-123-456 / ✉️ hello@petsnack.tw</div>`;
+
   return `
     ${header}
-    <div class="occ-order-no">訂單編號：<code>${o.orderId}</code></div>
+    <div class="occ-order-no">訂單編號:<code>${escHtml(o.orderId)}</code></div>
+    ${etaText && !isLookup ? `<div class="occ-eta">${etaText}</div>` : ''}
     ${items ? `<div class="occ-items-section">
       <div class="occ-section-label">訂購品項</div>
       ${items}
@@ -1507,12 +1550,29 @@ function renderOrderConfirmContent(o, isLookup) {
       <div class="occ-total-row"><span>運費</span><span>NT$${(o.shipping || 0).toLocaleString()}</span></div>
       <div class="occ-total-row grand"><span>總金額</span><span>NT$${(o.totalAmount || 0).toLocaleString()}</span></div>
     </div>
-    ${(o.customer?.name || o.shippingInfo?.address) ? `<div class="occ-shipping">
-      <div class="occ-section-label">收件資訊</div>
-      ${o.customer?.name ? `<div class="occ-addr-row">👤 ${o.customer.name}</div>` : ''}
-      ${o.shippingInfo?.address ? `<div class="occ-addr-row">📍 ${o.shippingInfo.address}</div>` : ''}
-    </div>` : ''}
-    <button class="modal-btn primary" onclick="closeOrderConfirmModal();switchPage('shop')">繼續購物 →</button>`;
+    ${recipientBlock}
+    ${cvsBlock}
+    ${ctaBlock}`;
+}
+
+/* 在訂單成功 modal 上點「隨時查詢狀態」— 把訂單編號複製到剪貼簿 + 顯示提示 */
+function reopenOrderLookup(orderIdEnc) {
+  const orderId = decodeURIComponent(orderIdEnc);
+  closeOrderConfirmModal();
+  // 嘗試複製到剪貼簿
+  if (navigator.clipboard?.writeText) {
+    navigator.clipboard.writeText(orderId).then(
+      () => showToast(`訂單編號已複製:${orderId}`, true),
+      () => showToast(`訂單編號:${orderId}`, true)
+    );
+  } else {
+    showToast(`訂單編號:${orderId}`, true);
+  }
+  // 把編號帶進 footer 查詢框,讓使用者下次來可以直接送
+  setTimeout(() => {
+    const inp = document.getElementById('footer-order-lookup-input');
+    if (inp) { inp.value = orderId; inp.focus(); inp.scrollIntoView({behavior:'smooth', block:'center'}); }
+  }, 200);
 }
 
 /* ============================ CONFIRM MODAL ============================ */

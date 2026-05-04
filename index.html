@@ -416,6 +416,17 @@
     <div class="footer-col">
       <h5>顧客服務</h5>
       <ul><li>常見問題</li><li>退換貨政策</li><li>會員權益</li><li>配送與運費</li></ul>
+      <div class="footer-lookup">
+        <h5 style="margin-top:14px;font-size:13px">🔍 查詢我的訂單</h5>
+        <div class="footer-lookup-row">
+          <input type="text" id="footer-order-lookup-input" placeholder="訂單編號 #..." maxlength="64"
+                 onkeypress="if(event.key==='Enter')lookupOrder('footer-order-lookup-input','footer-order-lookup-error')"
+                 aria-label="輸入訂單編號">
+          <button class="footer-lookup-btn"
+                  onclick="lookupOrder('footer-order-lookup-input','footer-order-lookup-error')">查詢</button>
+        </div>
+        <div id="footer-order-lookup-error" role="alert" class="footer-lookup-err"></div>
+      </div>
     </div>
     <div class="footer-col">
       <h5>聯絡我們</h5>
