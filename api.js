@@ -109,6 +109,17 @@
       return this._fetch('/payments/bank-info');
     },
 
+    /* ---------- Category meta (公開讀取) ---------- */
+    categories() {
+      return this._fetch('/categories');
+    },
+    adminUpdateCategory(key, data) {
+      return this._fetch('/admin/categories/' + encodeURIComponent(key), {
+        method: 'PATCH',
+        body: JSON.stringify(data),
+      });
+    },
+
     /* ---------- Admin: Bundles ---------- */
     adminListBundles() {
       return this._fetch('/admin/bundles');

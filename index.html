@@ -138,7 +138,7 @@
 
   <section class="category-showcase">
     <article class="cat-showcase-row" data-cat="dog">
-      <div class="csr-img" aria-hidden="true">
+      <div class="csr-img" aria-hidden="true" id="csr-img-dog">
         <span class="csr-emoji">🐶</span>
       </div>
       <div class="csr-info">
@@ -150,7 +150,7 @@
     </article>
 
     <article class="cat-showcase-row reverse" data-cat="cat">
-      <div class="csr-img" aria-hidden="true">
+      <div class="csr-img" aria-hidden="true" id="csr-img-cat">
         <span class="csr-emoji">🐱</span>
       </div>
       <div class="csr-info">
@@ -162,7 +162,7 @@
     </article>
 
     <article class="cat-showcase-row" data-cat="both">
-      <div class="csr-img" aria-hidden="true">
+      <div class="csr-img" aria-hidden="true" id="csr-img-both">
         <span class="csr-emoji">🌟</span>
       </div>
       <div class="csr-info">
@@ -280,6 +280,17 @@
     <div class="stat-card"><div class="stat-emoji">📦</div><div class="stat-value" id="stat-pending">—</div><div class="stat-label">待出貨</div></div>
     <div class="stat-card stat-warning" id="stat-lowstock-card" style="cursor:pointer" onclick="document.getElementById('stock-admin-card').scrollIntoView({behavior:'smooth'})" title="點擊查看低庫存商品">
       <div class="stat-emoji">⚠️</div><div class="stat-value" id="stat-lowstock">—</div><div class="stat-label">低庫存警示</div>
+    </div>
+  </div>
+
+  <!-- 分類橫幅圖片設定 -->
+  <div class="admin-card">
+    <div class="admin-card-hd">
+      <h3>🖼️ 系列橫幅圖片</h3>
+      <span class="admin-hint">建議尺寸 1200 × 800 px (3:2),JPG/WebP &lt; 200 KB</span>
+    </div>
+    <div id="admin-category-images" class="cat-image-grid">
+      <div class="bundle-admin-empty">載入中...</div>
     </div>
   </div>
 

@@ -395,6 +395,85 @@ const CATEGORY_META = {
           desc: '狗狗貓咪都適用的精選配方,溫和不刺激,是多寵物家庭的理想選擇。' },
 };
 
+/* admin 可上傳分類橫幅圖,fetch 後存這裡;空字串 = 沿用 emoji */
+let CATEGORY_IMAGES = { dog: '', cat: '', both: '' };
+
+async function loadCategoryImages() {
+  try {
+    const { categories } = await Api.categories();
+    (categories || []).forEach((c) => {
+      if (CATEGORY_IMAGES[c.key] !== undefined) CATEGORY_IMAGES[c.key] = c.imageUrl || '';
+    });
+    applyCategoryImagesToShowcase();
+  } catch (e) {
+    // 失靜默 — 沿用 emoji 即可,不擋首頁
+    console.warn('載入分類圖片失敗,沿用 emoji:', e.message);
+  }
+}
+
+/* admin 後台:渲染三個分類的圖片網址編輯卡 */
+function renderAdminCategoryImages() {
+  const wrap = document.getElementById('admin-category-images');
+  if (!wrap) return;
+  wrap.innerHTML = ['dog', 'cat', 'both'].map((key) => {
+    const meta = CATEGORY_META[key];
+    const url = CATEGORY_IMAGES[key] || '';
+    const previewHtml = url
+      ? `<img src="${escHtml(url)}" alt="" class="cat-image-preview-img" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"><div class="cat-image-preview-fallback" style="display:none">⚠ 圖片載入失敗</div>`
+      : `<div class="cat-image-preview-fallback">${escHtml(meta.emoji)} 尚未設定圖片</div>`;
+    return `
+      <div class="cat-image-row">
+        <div class="cat-image-preview">${previewHtml}</div>
+        <div class="cat-image-form">
+          <label class="cat-image-label">${escHtml(meta.title)}</label>
+          <input type="url" id="cat-img-${key}" class="cat-image-input"
+                 value="${escHtml(url)}" placeholder="https://..."
+                 onkeypress="if(event.key==='Enter')saveCategoryImage('${key}')">
+          <div class="cat-image-actions">
+            <button class="pill-btn green" onclick="saveCategoryImage('${key}')">儲存</button>
+            ${url ? `<button class="pill-btn gray" onclick="clearCategoryImage('${key}')">清除</button>` : ''}
+          </div>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+async function saveCategoryImage(key) {
+  const inp = document.getElementById('cat-img-' + key);
+  if (!inp) return;
+  const imageUrl = inp.value.trim();
+  try {
+    await Api.adminUpdateCategory(key, { imageUrl });
+    CATEGORY_IMAGES[key] = imageUrl;
+    applyCategoryImagesToShowcase();
+    renderAdminCategoryImages();
+    showToast(imageUrl ? `✓ ${CATEGORY_META[key].title} 圖片已更新` : `✓ 已清除${CATEGORY_META[key].title}圖片`, true);
+  } catch (e) {
+    showToast('儲存失敗: ' + (e.message || ''), false);
+  }
+}
+
+async function clearCategoryImage(key) {
+  const inp = document.getElementById('cat-img-' + key);
+  if (inp) inp.value = '';
+  await saveCategoryImage(key);
+}
+
+/* 把 CATEGORY_IMAGES 套用到首頁三個系列橫幅 (csr-img-dog/cat/both) */
+function applyCategoryImagesToShowcase() {
+  ['dog', 'cat', 'both'].forEach((key) => {
+    const wrap = document.getElementById('csr-img-' + key);
+    if (!wrap) return;
+    const url = CATEGORY_IMAGES[key];
+    const meta = CATEGORY_META[key];
+    if (url) {
+      wrap.innerHTML = `<img src="${escHtml(url)}" alt="${escHtml(meta.title)}" class="csr-real-img" onerror="this.parentNode.innerHTML='<span class=&quot;csr-emoji&quot;>${escHtml(meta.emoji)}</span>'">`;
+    } else {
+      wrap.innerHTML = `<span class="csr-emoji">${escHtml(meta.emoji)}</span>`;
+    }
+  });
+}
+
 function goCategory(type) {
   if (!CATEGORY_META[type]) return;
   location.hash = '#/cat/' + type;
@@ -406,7 +485,16 @@ function renderCategoryPage(type) {
   document.getElementById('cat-hero-eyebrow').textContent = meta.eyebrow;
   document.getElementById('cat-hero-title').textContent = meta.title;
   document.getElementById('cat-hero-desc').textContent = meta.desc;
-  document.getElementById('cat-hero-emoji').textContent = meta.emoji;
+  // hero 區圖片:有 imageUrl 則顯示 <img> + cover crop;否則 emoji
+  const heroBg = document.getElementById('cat-hero-bg');
+  if (heroBg) {
+    const url = CATEGORY_IMAGES[type];
+    if (url) {
+      heroBg.innerHTML = `<img src="${escHtml(url)}" alt="${escHtml(meta.title)}" class="cat-hero-img" onerror="this.parentNode.innerHTML='<span class=&quot;cat-hero-emoji&quot;>${escHtml(meta.emoji)}</span>'">`;
+    } else {
+      heroBg.innerHTML = `<span class="cat-hero-emoji" id="cat-hero-emoji">${escHtml(meta.emoji)}</span>`;
+    }
+  }
 
   const grid = document.getElementById('cat-products-grid');
   const list = ALL_PRODUCTS.filter(p => p.type === type || (type !== 'both' && p.type === 'both'));
@@ -636,6 +724,7 @@ async function reloadAdminLists() {
     ADDON_PRODUCTS = aRes.addons.map(_normalizeAddon);
     renderBundleAdmin();
     renderAddonAdmin();
+    renderAdminCategoryImages();
     updateStats();
     renderBundleShop();
     renderBundleDealer();
@@ -2421,6 +2510,8 @@ async function init() {
   renderChipSelector();
   updatePreview();
   await tryRestoreSession();
+  // 不擋首頁載入,平行抓分類圖片設定
+  loadCategoryImages();
   await reloadCatalog();
   if (currentUser?.role === 'admin') await reloadAdminLists();
   updateRolePill();

@@ -279,9 +279,13 @@ body.searching #page-shop > .section-title{display:none}
 .csr-img{
   background:linear-gradient(135deg,var(--accent-banner) 0%,var(--primary-light) 100%);
   display:flex;align-items:center;justify-content:center;
-  min-height:240px;
+  min-height:240px;position:relative;overflow:hidden;
 }
 .csr-emoji{font-size:120px;line-height:1}
+.csr-img img.csr-real-img{
+  width:100%;height:100%;object-fit:cover;display:block;
+  position:absolute;inset:0;
+}
 .csr-info{padding:40px 36px;display:flex;flex-direction:column;justify-content:center;gap:14px}
 .csr-eyebrow{
   font-family:'Playfair Display',serif;font-size:13px;
@@ -311,8 +315,38 @@ body.searching #page-shop > .section-title{display:none}
 .cat-hero-bg{
   background:linear-gradient(135deg,var(--accent-banner) 0%,var(--primary-light) 100%);
   display:flex;align-items:center;justify-content:center;min-height:200px;
+  position:relative;overflow:hidden;
 }
 .cat-hero-emoji{font-size:120px;line-height:1}
+.cat-hero-bg img.cat-hero-img{
+  width:100%;height:100%;object-fit:cover;display:block;
+  position:absolute;inset:0;
+}
+
+/* admin: 系列橫幅圖片設定 */
+.cat-image-grid{display:grid;grid-template-columns:1fr;gap:14px}
+@media(min-width:768px){.cat-image-grid{grid-template-columns:repeat(3,1fr)}}
+.cat-image-row{
+  border:1px solid var(--border);border-radius:var(--radius-md);
+  background:var(--bg);overflow:hidden;display:flex;flex-direction:column;
+}
+.cat-image-preview{
+  aspect-ratio:3/2;background:linear-gradient(135deg,var(--accent-banner) 0%,var(--primary-light) 100%);
+  display:flex;align-items:center;justify-content:center;overflow:hidden;position:relative;
+}
+.cat-image-preview-img{width:100%;height:100%;object-fit:cover;display:block}
+.cat-image-preview-fallback{
+  font-size:14px;color:var(--text-light);font-weight:600;
+  padding:10px;text-align:center;
+}
+.cat-image-form{padding:12px;display:flex;flex-direction:column;gap:8px}
+.cat-image-label{font-size:13px;font-weight:700;color:var(--text)}
+.cat-image-input{
+  padding:8px 10px;border:1px solid var(--border);border-radius:6px;
+  font:inherit;font-size:12px;background:var(--white);
+}
+.cat-image-input:focus{outline:none;border-color:var(--primary)}
+.cat-image-actions{display:flex;gap:6px}
 .cat-hero-info{padding:36px 32px;display:flex;flex-direction:column;justify-content:center;gap:12px}
 .cat-hero-info h2{
   font-family:'Noto Sans TC',sans-serif;font-size:26px;
