@@ -105,7 +105,7 @@
         <!-- 會員下拉選單 (點 role-pill 時切換顯示) -->
         <div class="account-menu" id="account-menu" role="menu" aria-hidden="true">
           <button class="acct-item" role="menuitem" onclick="_closeAccountMenu();switchPage('myorders');loadMyOrders()">📋 我的訂單</button>
-          <button class="acct-item" role="menuitem" onclick="_closeAccountMenu();switchPage('account');loadAccountForm()">👤 我的帳號</button>
+          <button class="acct-item" role="menuitem" onclick="_closeAccountMenu();switchPage('account');loadAccountForm()">👤 我的帳號 / 優惠券</button>
           <button class="acct-item" role="menuitem" onclick="_closeAccountMenu();logout()">🚪 登出</button>
         </div>
       </div>
@@ -610,6 +610,19 @@
         </button>
       </div>
     </div>
+    <!-- 優惠券 (僅會員顯示;客端不顯示時 display:none) -->
+    <div class="modal-field co-coupon-wrap" id="co-coupon-wrap" style="display:none">
+      <label>🎟 優惠券 <span style="color:var(--text-light);font-weight:500">(可選)</span></label>
+      <div class="co-coupon-row">
+        <input type="text" id="co-coupon-input" placeholder="輸入券號或從下方選擇" maxlength="40" autocomplete="off">
+        <button type="button" class="modal-btn outline co-coupon-apply" onclick="applyCheckoutCoupon()">套用</button>
+      </div>
+      <div id="co-coupon-list" class="co-coupon-list"></div>
+      <div id="co-coupon-status" class="co-coupon-status" role="status" aria-live="polite"></div>
+    </div>
+    <!-- 金額摘要 -->
+    <div class="co-summary" id="co-summary"></div>
+
     <div id="checkout-error" role="alert" aria-live="assertive" style="min-height:20px;color:var(--red);font-size:12px;font-weight:700;margin-bottom:8px"></div>
     <div class="modal-actions">
       <button class="modal-btn primary" id="co-submit" onclick="confirmCheckout()">確認結帳 →</button>

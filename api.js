@@ -102,6 +102,17 @@
       return this._fetch('/orders/mine' + (q ? '?' + q : ''));
     },
 
+    /* ---------- Coupons (需登入) ---------- */
+    myCoupons(status = 'all') {
+      return this._fetch('/coupons/mine?status=' + encodeURIComponent(status));
+    },
+    validateCoupon(code, subtotal) {
+      return this._fetch('/coupons/validate', {
+        method: 'POST',
+        body: JSON.stringify({ code, subtotal }),
+      });
+    },
+
     /* ---------- 公開:商品 / 組合包 / 加價購 ---------- */
     products(type) {
       const q = type && type !== 'all' ? `?type=${type}` : '';

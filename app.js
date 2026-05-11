@@ -244,11 +244,22 @@ function updateRolePill() {
   const pill = document.getElementById('role-pill');
   const icon = document.getElementById('role-icon');
   const text = document.getElementById('role-text');
-  pill.classList.remove('dealer', 'admin', 'customer');
+  pill.classList.remove('dealer', 'admin', 'customer', 'vip');
   if (!currentUser) { icon.textContent = '👤'; text.textContent = '登入 / 註冊'; }
   else if (currentUser.role === 'dealer')   { pill.classList.add('dealer');   icon.textContent = '💼'; text.textContent = currentUser.displayName; }
   else if (currentUser.role === 'admin')    { pill.classList.add('admin');    icon.textContent = '⚙️'; text.textContent = currentUser.displayName; }
-  else if (currentUser.role === 'customer') { pill.classList.add('customer'); icon.textContent = '👋'; text.textContent = currentUser.displayName; }
+  else if (currentUser.role === 'customer') {
+    pill.classList.add('customer');
+    const isVip = currentUser.tier === 'vip';
+    if (isVip) {
+      pill.classList.add('vip');
+      icon.textContent = '👑';
+      text.textContent = currentUser.displayName + ' · VIP';
+    } else {
+      icon.textContent = '👋';
+      text.textContent = currentUser.displayName;
+    }
+  }
 }
 
 /* customer 點 role-pill → 切換下拉選單;admin/dealer 點 → 直接 logout */
@@ -328,9 +339,27 @@ async function loadAccountForm() {
   try {
     const { user } = await Api.me();
     currentUser = { ...currentUser, ...user };
+    updateRolePill();
+    const tierBadge = user.tier === 'vip'
+      ? `<span class="tier-badge vip">👑 VIP</span>`
+      : `<span class="tier-badge normal">一般會員</span>`;
+    const vipSinceText = user.vipSince
+      ? `<div class="acct-stat-line">VIP 升等於 ${new Date(user.vipSince).toLocaleDateString('zh-TW')}</div>`
+      : '';
+    const upgradeHint = user.tier === 'normal'
+      ? `<div class="acct-stat-line hint">💡 單筆訂單滿 NT$ 2000 即可升 VIP,並獲得 9 折券</div>`
+      : '';
+
     wrap.innerHTML = `
       <div class="admin-card" style="max-width:none">
-        <div class="admin-card-hd"><h3>👤 個人資料</h3></div>
+        <div class="admin-card-hd">
+          <h3>👤 個人資料 ${tierBadge}</h3>
+        </div>
+        <div class="acct-stats">
+          <div class="acct-stat-line">累計消費:<strong>NT$ ${(user.lifetimeSpend || 0).toLocaleString()}</strong></div>
+          ${vipSinceText}
+          ${upgradeHint}
+        </div>
         <div class="form-grid" style="padding:18px 20px">
           <div><label for="acc-email">Email <span style="color:var(--text-light);font-weight:500">(不可修改)</span></label>
             <input type="email" id="acc-email" value="${escHtml(user.email || '')}" disabled style="background:var(--bg)"></div>
@@ -357,7 +386,66 @@ async function loadAccountForm() {
         <div class="form-actions" style="padding:0 20px 16px">
           <button class="pill-btn green" onclick="saveAccountPassword()">更新密碼</button>
         </div>
+      </div>
+
+      <div class="admin-card" style="max-width:none">
+        <div class="admin-card-hd"><h3>🎟 我的優惠券</h3></div>
+        <div id="acct-coupons-list" style="padding:18px 20px">
+          <div class="bundle-admin-empty">載入中...</div>
+        </div>
       </div>`;
+
+    // 非同步載入優惠券列表 (不擋帳號表單)
+    _loadAccountCoupons();
+  } catch (e) {
+    wrap.innerHTML = `<div class="bundle-admin-empty">載入失敗:${escHtml(e.message || '')}</div>`;
+  }
+}
+
+async function _loadAccountCoupons() {
+  const wrap = document.getElementById('acct-coupons-list');
+  if (!wrap) return;
+  try {
+    const { coupons } = await Api.myCoupons('all');
+    if (!coupons.length) {
+      wrap.innerHTML = `
+        <div class="bundle-admin-empty">
+          目前沒有任何優惠券。<br>
+          <small style="color:var(--text-light)">註冊會送 NT$ 50 券,單筆滿 2000 升 VIP 再送 9 折券。</small>
+        </div>`;
+      return;
+    }
+    wrap.innerHTML = coupons.map((c) => {
+      const desc = c.type === 'fixed' ? `折 NT$ ${c.value}` : `${100 - c.value} 折`;
+      const minSpend = c.minSpend ? `滿 NT$ ${c.minSpend} 可用` : '無消費門檻';
+      const exp = c.expiresAt
+        ? new Date(c.expiresAt).toLocaleString('zh-TW', { hour12: false })
+        : '無期限';
+      const sourceMap = {
+        register_bonus: '🎁 註冊禮',
+        vip_upgrade:    '👑 VIP 升等',
+        manual:         '🎫 客服發送',
+      };
+      const statusMap = {
+        active:    { label: '可使用',   cls: 'ok' },
+        used:      { label: '已使用',   cls: 'used' },
+        expired:   { label: '已過期',   cls: 'expired' },
+        cancelled: { label: '已取消',   cls: 'expired' },
+      };
+      const st = statusMap[c.status] || { label: c.status, cls: 'expired' };
+      return `
+        <div class="my-coupon-card my-coupon-${st.cls}">
+          <div class="mcc-head">
+            <code class="mcc-code">${escHtml(c.code)}</code>
+            <span class="mcc-status ${st.cls}">${st.label}</span>
+          </div>
+          <div class="mcc-desc"><strong>${escHtml(desc)}</strong> · ${escHtml(minSpend)}</div>
+          <div class="mcc-foot">
+            <span class="mcc-source">${sourceMap[c.source] || c.source}</span>
+            <span class="mcc-exp">${escHtml(exp)} 前${c.status === 'used' && c.usedOrderId ? ' · 已用於 ' + escHtml(c.usedOrderId) : ''}</span>
+          </div>
+        </div>`;
+    }).join('');
   } catch (e) {
     wrap.innerHTML = `<div class="bundle-admin-empty">載入失敗:${escHtml(e.message || '')}</div>`;
   }
@@ -1657,9 +1745,119 @@ function openCheckoutModal() {
     }
   }
 
+  // 重置券狀態 + 預載會員可用券
+  _appliedCoupon = null;
+  const couponWrap = document.getElementById('co-coupon-wrap');
+  if (couponWrap) {
+    couponWrap.style.display = isCustomer ? 'block' : 'none';
+  }
+  if (isCustomer) {
+    _loadMyCouponsForCheckout();
+  }
+  // 立即渲染金額摘要 (沒有券時也顯示小計+運費+合計)
+  updateCheckoutSummary();
+
   modal.classList.add('active');
   modal.setAttribute('aria-hidden', 'false');
   setTimeout(() => document.getElementById('co-name').focus(), 100);
+}
+
+/* 載入會員 active 券到下拉清單 */
+async function _loadMyCouponsForCheckout() {
+  const listEl = document.getElementById('co-coupon-list');
+  const statusEl = document.getElementById('co-coupon-status');
+  if (!listEl) return;
+  listEl.innerHTML = '';
+  if (statusEl) statusEl.textContent = '';
+  try {
+    const { coupons } = await Api.myCoupons('active');
+    _myActiveCoupons = coupons || [];
+    if (!_myActiveCoupons.length) {
+      listEl.innerHTML = '<div class="co-coupon-hint">目前沒有可用優惠券</div>';
+      return;
+    }
+    listEl.innerHTML = '<div class="co-coupon-hint">點選下方券快速套用:</div>' +
+      _myActiveCoupons.map((c) => {
+        const desc = c.type === 'fixed'
+          ? `折 NT$ ${c.value}`
+          : `${100 - c.value} 折`;
+        const minSpend = c.minSpend ? `滿 NT$ ${c.minSpend} 可用` : '無門檻';
+        const exp = c.expiresAt
+          ? new Date(c.expiresAt).toLocaleDateString('zh-TW')
+          : '無期限';
+        return `
+          <button type="button" class="co-coupon-chip" onclick="_pickCoupon('${escAttrJs(c.code)}')">
+            <span class="cc-code">${escHtml(c.code)}</span>
+            <span class="cc-desc">${escHtml(desc)} · ${escHtml(minSpend)}</span>
+            <span class="cc-exp">${escHtml(exp)} 前</span>
+          </button>`;
+      }).join('');
+  } catch (e) {
+    // 失敗靜默,不影響結帳
+    _myActiveCoupons = [];
+  }
+}
+
+function _pickCoupon(code) {
+  const input = document.getElementById('co-coupon-input');
+  if (input) input.value = code;
+  applyCheckoutCoupon();
+}
+
+async function applyCheckoutCoupon() {
+  const input = document.getElementById('co-coupon-input');
+  const status = document.getElementById('co-coupon-status');
+  if (!input || !status) return;
+  const code = input.value.trim();
+  if (!code) {
+    _appliedCoupon = null;
+    status.className = 'co-coupon-status';
+    status.textContent = '';
+    updateCheckoutSummary();
+    return;
+  }
+  // 計算當前小計 (不含運費,不含優惠)
+  const subtotal = Object.values(cart || {}).reduce(
+    (s, item) => s + (item.price * item.qty), 0
+  );
+  status.className = 'co-coupon-status loading';
+  status.textContent = '驗證中...';
+  try {
+    const r = await Api.validateCoupon(code, subtotal);
+    _appliedCoupon = {
+      code: r.coupon.code,
+      discount: r.discount,
+      type: r.coupon.type,
+      value: r.coupon.value,
+    };
+    status.className = 'co-coupon-status ok';
+    status.textContent = `✓ 已套用,折抵 NT$ ${r.discount}`;
+    updateCheckoutSummary();
+  } catch (e) {
+    _appliedCoupon = null;
+    status.className = 'co-coupon-status err';
+    status.textContent = '⚠ ' + (e.message || '優惠券無效');
+    updateCheckoutSummary();
+  }
+}
+
+/* 計算 + 渲染金額摘要 */
+function updateCheckoutSummary() {
+  const el = document.getElementById('co-summary');
+  if (!el) return;
+  const subtotal = Object.values(cart || {}).reduce(
+    (s, item) => s + (item.price * item.qty), 0
+  );
+  const discount = _appliedCoupon?.discount || 0;
+  const afterDiscount = Math.max(0, subtotal - discount);
+  const shipping = afterDiscount >= 500 ? 0 : 60;  // 跟 backend business 一致
+  const total = afterDiscount + shipping;
+  el.innerHTML = `
+    <div class="cos-row"><span>商品小計</span><span>NT$ ${subtotal.toLocaleString()}</span></div>
+    ${discount > 0 ? `<div class="cos-row discount"><span>🎟 優惠折抵 (${escHtml(_appliedCoupon.code)})</span><span>-NT$ ${discount.toLocaleString()}</span></div>` : ''}
+    <div class="cos-row"><span>運費</span><span>${shipping === 0 ? '<span class="cos-free">免運</span>' : 'NT$ ' + shipping}</span></div>
+    <div class="cos-row total"><span>應付金額</span><span class="cos-total">NT$ ${total.toLocaleString()}</span></div>
+  `;
 }
 
 function closeCheckoutModal() {
@@ -1672,6 +1870,11 @@ function closeCheckoutModal() {
 let _checkoutShippingMethod = 'home_delivery';
 let _selectedCvStore = null;  // { cvStoreId, cvStoreName, cvAddress }
 let _checkoutPaymentMethod = 'linepay';
+
+/* ============================ CHECKOUT COUPON STATE ============================ */
+/* 結帳時套用的券:{ code, discount, type, value, message } | null */
+let _appliedCoupon = null;
+let _myActiveCoupons = [];  // 載入會員可用券快取
 
 function setPaymentMethod(method) {
   _checkoutPaymentMethod = method;
@@ -1828,6 +2031,7 @@ async function confirmCheckout() {
     shippingInfo: isCvs
       ? { cvStoreId: _selectedCvStore.cvStoreId, cvStoreName: _selectedCvStore.cvStoreName }
       : { address },
+    ...(_appliedCoupon?.code ? { couponCode: _appliedCoupon.code } : {}),
   };
 
   const submitBtn = document.getElementById('co-submit');
