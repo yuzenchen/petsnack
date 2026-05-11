@@ -1157,13 +1157,19 @@ body.role-admin .bnav-btn.admin-only{display:flex}
   background:var(--white);border-radius:var(--radius-lg);padding:28px;
   max-width:380px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,0.25);
   position:relative;animation:modalIn .25s ease-out;
+  /* 內容過長時可滾動 (結帳 modal 加了優惠券 + 摘要區之後容易超出視窗) */
+  max-height:calc(100vh - 40px);overflow-y:auto;
 }
+/* 滾動條淡化處理,避免視覺干擾 */
+.modal::-webkit-scrollbar{width:6px}
+.modal::-webkit-scrollbar-thumb{background:rgba(0,0,0,0.2);border-radius:3px}
+.modal::-webkit-scrollbar-thumb:hover{background:rgba(0,0,0,0.35)}
 @keyframes modalIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
 .modal-close{
-  position:absolute;top:12px;right:12px;background:none;border:none;
+  position:sticky;top:0;float:right;background:var(--white);border:none;
   font-size:24px;color:var(--text-light);width:32px;height:32px;
   display:flex;align-items:center;justify-content:center;border-radius:50%;
-  transition:all .2s;
+  transition:all .2s;z-index:10;margin:-12px -8px 0 0;
 }
 .modal-close:hover{background:var(--bg);color:var(--text)}
 .modal-icon{font-size:42px;text-align:center;margin-bottom:6px;line-height:1}
