@@ -34,14 +34,29 @@ let _searchTimer = null;
 let _mobileSearchTimer = null;
 
 /* ============================ AUTH ============================ */
-function openLoginModal() {
-  if (currentUser) { logout(); return; }
+function openLoginModal(initialTab) {
+  if (currentUser) { openAccountMenu(); return; }
   _lastFocusedBeforeModal = document.activeElement;
   const m = document.getElementById('login-modal');
   m.classList.add('active');
   m.setAttribute('aria-hidden', 'false');
   document.getElementById('login-error').textContent = '';
-  setTimeout(() => document.getElementById('login-user').focus(), 100);
+  const regErr = document.getElementById('register-error');
+  if (regErr) regErr.textContent = '';
+  switchAuthTab(initialTab || 'login');
+}
+
+function switchAuthTab(which) {
+  const isLogin = which === 'login';
+  document.getElementById('tab-login')?.classList.toggle('active', isLogin);
+  document.getElementById('tab-register')?.classList.toggle('active', !isLogin);
+  document.getElementById('tab-login')?.setAttribute('aria-selected', isLogin ? 'true' : 'false');
+  document.getElementById('tab-register')?.setAttribute('aria-selected', isLogin ? 'false' : 'true');
+  document.getElementById('auth-pane-login')?.classList.toggle('active', isLogin);
+  document.getElementById('auth-pane-register')?.classList.toggle('active', !isLogin);
+  setTimeout(() => {
+    document.getElementById(isLogin ? 'login-user' : 'reg-name')?.focus();
+  }, 50);
 }
 
 function closeLoginModal() {
@@ -51,6 +66,12 @@ function closeLoginModal() {
   document.getElementById('login-user').value = '';
   document.getElementById('login-pass').value = '';
   document.getElementById('login-error').textContent = '';
+  // 註冊頁也清空
+  ['reg-name', 'reg-email', 'reg-pass', 'reg-phone'].forEach((id) => {
+    const el = document.getElementById(id); if (el) el.value = '';
+  });
+  const regErr = document.getElementById('register-error');
+  if (regErr) regErr.textContent = '';
   if (_lastFocusedBeforeModal) {
     try { _lastFocusedBeforeModal.focus(); } catch (e) {}
   }
@@ -126,26 +147,64 @@ async function doLogin() {
   if (!u || !p) { err.textContent = '⚠ 請輸入帳號密碼'; return; }
   try {
     const result = await Api.login(u, p);
-    Api.setToken(result.token);
-    currentUser = result.user;
-    document.body.classList.remove('role-guest');
-    document.body.classList.add('role-' + result.user.role);
-    err.textContent = '';
-    closeLoginModal();
-    await reloadCatalog();
-    if (result.user.role === 'admin') await reloadAdminLists();
-    updateRolePill();
-    showToast(`✓ 歡迎 ${result.user.displayName}！`, true);
-    if (result.user.role === 'dealer') {
-      document.getElementById('dealer-welcome').textContent = `歡迎，${result.user.displayName}`;
-      setTimeout(() => switchPage('dealer'), 400);
-    }
-    if (result.user.role === 'admin') {
-      setTimeout(() => switchPage('admin'), 400);
-    }
+    await _applyLoginResult(result, err);
   } catch (e) {
     err.textContent = '⚠ ' + (e.network ? '無法連線到後端,請確認 API 是否啟動' : (e.message || '登入失敗'));
     showToast(e.message || '登入失敗', false);
+  }
+}
+
+async function doRegister() {
+  const err = document.getElementById('register-error');
+  const displayName = document.getElementById('reg-name').value.trim();
+  const email = document.getElementById('reg-email').value.trim();
+  const password = document.getElementById('reg-pass').value;
+  const phone = document.getElementById('reg-phone').value.trim();
+
+  if (!displayName) { err.textContent = '⚠ 請輸入姓名'; return; }
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    err.textContent = '⚠ Email 格式不正確'; return;
+  }
+  if (!password || password.length < 8 || !/[A-Za-z]/.test(password) || !/\d/.test(password)) {
+    err.textContent = '⚠ 密碼至少 8 字元,需包含英文與數字'; return;
+  }
+  if (phone && !/^09\d{8}$/.test(phone.replace(/[-\s]/g, ''))) {
+    err.textContent = '⚠ 手機格式應為 09xxxxxxxx'; return;
+  }
+  err.textContent = '';
+
+  try {
+    const result = await Api.register({ displayName, email, password, phone });
+    await _applyLoginResult(result, err, /* isRegister */ true);
+  } catch (e) {
+    err.textContent = '⚠ ' + (e.network ? '無法連線到後端' : (e.message || '註冊失敗'));
+    showToast(e.message || '註冊失敗', false);
+  }
+}
+
+/* 共用:把 login/register 回傳的 result 套用到 UI 狀態 */
+async function _applyLoginResult(result, errEl, isRegister) {
+  Api.setToken(result.token);
+  currentUser = result.user;
+  document.body.classList.remove('role-guest');
+  document.body.classList.add('role-' + result.user.role);
+  if (errEl) errEl.textContent = '';
+  closeLoginModal();
+  await reloadCatalog();
+  if (result.user.role === 'admin') await reloadAdminLists();
+  updateRolePill();
+  showToast(
+    isRegister
+      ? `✓ 註冊成功,歡迎 ${result.user.displayName}！`
+      : `✓ 歡迎 ${result.user.displayName}！`,
+    true
+  );
+  // admin / dealer 自動切到對應頁;customer 留在當前頁
+  if (result.user.role === 'dealer') {
+    document.getElementById('dealer-welcome').textContent = `歡迎，${result.user.displayName}`;
+    setTimeout(() => switchPage('dealer'), 400);
+  } else if (result.user.role === 'admin') {
+    setTimeout(() => switchPage('admin'), 400);
   }
 }
 
@@ -185,10 +244,158 @@ function updateRolePill() {
   const pill = document.getElementById('role-pill');
   const icon = document.getElementById('role-icon');
   const text = document.getElementById('role-text');
-  pill.classList.remove('dealer', 'admin');
+  pill.classList.remove('dealer', 'admin', 'customer');
   if (!currentUser) { icon.textContent = '👤'; text.textContent = '登入 / 註冊'; }
-  else if (currentUser.role === 'dealer') { pill.classList.add('dealer'); icon.textContent = '💼'; text.textContent = currentUser.displayName; }
-  else if (currentUser.role === 'admin') { pill.classList.add('admin'); icon.textContent = '⚙️'; text.textContent = currentUser.displayName; }
+  else if (currentUser.role === 'dealer')   { pill.classList.add('dealer');   icon.textContent = '💼'; text.textContent = currentUser.displayName; }
+  else if (currentUser.role === 'admin')    { pill.classList.add('admin');    icon.textContent = '⚙️'; text.textContent = currentUser.displayName; }
+  else if (currentUser.role === 'customer') { pill.classList.add('customer'); icon.textContent = '👋'; text.textContent = currentUser.displayName; }
+}
+
+/* customer 點 role-pill → 切換下拉選單;admin/dealer 點 → 直接 logout */
+function openAccountMenu() {
+  if (!currentUser) return;
+  if (currentUser.role !== 'customer') { logout(); return; }
+  const menu = document.getElementById('account-menu');
+  if (!menu) return;
+  const isOpen = menu.classList.contains('open');
+  menu.classList.toggle('open', !isOpen);
+  if (!isOpen) {
+    // 點外面自動關閉
+    setTimeout(() => document.addEventListener('click', _closeAccountMenuOutside), 0);
+  }
+}
+function _closeAccountMenuOutside(e) {
+  const menu = document.getElementById('account-menu');
+  const pill = document.getElementById('role-pill');
+  if (!menu) return;
+  if (menu.contains(e.target) || pill?.contains(e.target)) return;
+  menu.classList.remove('open');
+  document.removeEventListener('click', _closeAccountMenuOutside);
+}
+function _closeAccountMenu() {
+  const menu = document.getElementById('account-menu');
+  if (menu) menu.classList.remove('open');
+  document.removeEventListener('click', _closeAccountMenuOutside);
+}
+
+/* ============================ MY ORDERS PAGE ============================ */
+async function loadMyOrders() {
+  const wrap = document.getElementById('myorders-content');
+  if (!wrap) return;
+  wrap.innerHTML = '<div class="bundle-admin-empty">載入中...</div>';
+  try {
+    const { orders } = await Api.myOrders({ page: 1, limit: 50 });
+    if (!orders.length) {
+      wrap.innerHTML = `
+        <div class="cart-empty">
+          <div class="cart-empty-emoji" aria-hidden="true">📋</div>
+          <h3>還沒有訂單</h3>
+          <p>去逛逛挑選喜歡的零食吧！</p>
+          <button class="back-shop-btn" onclick="switchPage('shop')">去逛逛 →</button>
+        </div>`;
+      return;
+    }
+    wrap.innerHTML = orders.map((o) => {
+      const date = new Date(o.createdAt).toLocaleString('zh-TW', { hour12: false });
+      const statusZh = ORDER_STATUS_ZH[o.status] || o.status;
+      const statusCls = STATUS_CLASS[o.status] || 's-pend';
+      const itemPreview = (o.items || []).slice(0, 3).map(i => escHtml(i.name || '')).join('、');
+      const moreItems = (o.items || []).length > 3 ? `…+${o.items.length - 3}` : '';
+      return `
+        <div class="my-order-card" onclick="openOrderConfirmModal('${encodeURIComponent(o.orderId)}', true)">
+          <div class="moc-head">
+            <code class="moc-id">${escHtml(o.orderId)}</code>
+            <span class="order-status ${statusCls}">${escHtml(statusZh)}</span>
+          </div>
+          <div class="moc-meta">${escHtml(date)}</div>
+          <div class="moc-items">${itemPreview}${moreItems}</div>
+          <div class="moc-foot">
+            <span class="moc-total">NT$ ${(o.totalAmount || 0).toLocaleString()}</span>
+            <span class="moc-view">查看詳情 →</span>
+          </div>
+        </div>`;
+    }).join('');
+  } catch (e) {
+    wrap.innerHTML = `<div class="bundle-admin-empty">載入失敗:${escHtml(e.message || '')}</div>`;
+  }
+}
+
+/* ============================ ACCOUNT PAGE ============================ */
+async function loadAccountForm() {
+  const wrap = document.getElementById('account-content');
+  if (!wrap) return;
+  wrap.innerHTML = '<div class="bundle-admin-empty">載入中...</div>';
+  try {
+    const { user } = await Api.me();
+    currentUser = { ...currentUser, ...user };
+    wrap.innerHTML = `
+      <div class="admin-card" style="max-width:none">
+        <div class="admin-card-hd"><h3>👤 個人資料</h3></div>
+        <div class="form-grid" style="padding:18px 20px">
+          <div><label for="acc-email">Email <span style="color:var(--text-light);font-weight:500">(不可修改)</span></label>
+            <input type="email" id="acc-email" value="${escHtml(user.email || '')}" disabled style="background:var(--bg)"></div>
+          <div><label for="acc-name">姓名 <span style="color:var(--sale)">*</span></label>
+            <input type="text" id="acc-name" value="${escHtml(user.displayName || '')}" autocomplete="name"></div>
+          <div><label for="acc-phone">手機</label>
+            <input type="tel" id="acc-phone" value="${escHtml(user.phone || '')}" placeholder="0912345678" autocomplete="tel"></div>
+          <div style="grid-column:1/-1"><label for="acc-addr">預設收件地址</label>
+            <input type="text" id="acc-addr" value="${escHtml(user.defaultAddress || '')}" placeholder="台北市中山區中山北路二段 1 號" autocomplete="street-address"></div>
+        </div>
+        <div class="form-actions" style="padding:0 20px 16px">
+          <button class="pill-btn green" onclick="saveAccountProfile()">儲存資料</button>
+        </div>
+      </div>
+
+      <div class="admin-card" style="max-width:none">
+        <div class="admin-card-hd"><h3>🔒 修改密碼</h3></div>
+        <div class="form-grid" style="padding:18px 20px">
+          <div><label for="acc-old-pw">舊密碼 <span style="color:var(--sale)">*</span></label>
+            <input type="password" id="acc-old-pw" autocomplete="current-password"></div>
+          <div><label for="acc-new-pw">新密碼 <span style="color:var(--sale)">*</span> <span style="color:var(--text-light);font-weight:500">(至少 8 字,英數)</span></label>
+            <input type="password" id="acc-new-pw" autocomplete="new-password"></div>
+        </div>
+        <div class="form-actions" style="padding:0 20px 16px">
+          <button class="pill-btn green" onclick="saveAccountPassword()">更新密碼</button>
+        </div>
+      </div>`;
+  } catch (e) {
+    wrap.innerHTML = `<div class="bundle-admin-empty">載入失敗:${escHtml(e.message || '')}</div>`;
+  }
+}
+
+async function saveAccountProfile() {
+  const displayName = document.getElementById('acc-name').value.trim();
+  const phone = document.getElementById('acc-phone').value.trim();
+  const defaultAddress = document.getElementById('acc-addr').value.trim();
+  if (!displayName) { showToast('請輸入姓名', false); return; }
+  if (phone && !/^09\d{8}$/.test(phone.replace(/[-\s]/g, ''))) {
+    showToast('手機格式應為 09xxxxxxxx', false); return;
+  }
+  try {
+    const { user } = await Api.updateMe({ displayName, phone, defaultAddress });
+    currentUser = { ...currentUser, ...user };
+    updateRolePill();
+    showToast('✓ 個人資料已更新', true);
+  } catch (e) {
+    showToast('更新失敗:' + (e.message || ''), false);
+  }
+}
+
+async function saveAccountPassword() {
+  const oldPw = document.getElementById('acc-old-pw').value;
+  const newPw = document.getElementById('acc-new-pw').value;
+  if (!oldPw) { showToast('請輸入舊密碼', false); return; }
+  if (!newPw || newPw.length < 8 || !/[A-Za-z]/.test(newPw) || !/\d/.test(newPw)) {
+    showToast('新密碼至少 8 字元,需含英數', false); return;
+  }
+  try {
+    await Api.changePassword(oldPw, newPw);
+    document.getElementById('acc-old-pw').value = '';
+    document.getElementById('acc-new-pw').value = '';
+    showToast('✓ 密碼已更新', true);
+  } catch (e) {
+    showToast('密碼更新失敗:' + (e.message || ''), false);
+  }
 }
 
 /* ============================ PRODUCT SEARCH ============================ */
@@ -358,6 +565,11 @@ function selectSearchResult(itemType, id) {
 function switchPage(name, opts = {}) {
   if ((name === 'dealer' && !currentUser) || (name === 'admin' && (!currentUser || currentUser.role !== 'admin'))) {
     openLoginModal();
+    return;
+  }
+  // 會員專屬頁
+  if ((name === 'myorders' || name === 'account') && (!currentUser || currentUser.role !== 'customer')) {
+    openLoginModal('login');
     return;
   }
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
@@ -1417,13 +1629,18 @@ function openCheckoutModal() {
   const modal = document.getElementById('checkout-modal');
   if (!modal) return;
 
-  // 從 localStorage 帶回上次填的資料
+  // 從 localStorage 帶回上次填的資料;若為登入會員,優先用 currentUser 個資
   let saved = {};
   try { saved = JSON.parse(localStorage.getItem(CO_KEY) || '{}'); } catch (_) {}
-  document.getElementById('co-name').value = saved.name || '';
-  document.getElementById('co-phone').value = saved.phone || '';
-  document.getElementById('co-address').value = saved.address || '';
-  document.getElementById('co-email').value = saved.email || '';
+  const isCustomer = currentUser?.role === 'customer';
+  document.getElementById('co-name').value =
+    saved.name || (isCustomer && currentUser.displayName) || '';
+  document.getElementById('co-phone').value =
+    saved.phone || (isCustomer && currentUser.phone) || '';
+  document.getElementById('co-address').value =
+    saved.address || (isCustomer && currentUser.defaultAddress) || '';
+  document.getElementById('co-email').value =
+    saved.email || (isCustomer && currentUser.email) || '';
   document.getElementById('checkout-error').textContent = '';
   const submitBtn = document.getElementById('co-submit');
   if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = '確認結帳 →'; }

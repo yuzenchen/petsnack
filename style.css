@@ -178,6 +178,22 @@ body.searching #page-shop > .section-title{display:none}
 .header-icons button:hover{color:var(--primary);background:var(--primary-light)}
 .role-pill.dealer{color:var(--pu)}
 .role-pill.admin{color:var(--am)}
+.role-pill.customer{color:var(--primary-dark)}
+
+/* 會員下拉選單 (從 role-pill 下方彈出) */
+.role-pill-wrap{position:relative;display:inline-block}
+.account-menu{
+  display:none;position:absolute;top:calc(100% + 6px);right:0;
+  background:var(--white);border:1px solid var(--border);border-radius:8px;
+  box-shadow:var(--shadow-md);min-width:160px;padding:6px;z-index:200;
+}
+.account-menu.open{display:block}
+.acct-item{
+  width:100%;text-align:left !important;padding:9px 12px !important;
+  background:none;border:none;font-size:13px;font-weight:500;color:var(--text);
+  border-radius:5px;cursor:pointer;transition:background .15s;display:block !important;
+}
+.acct-item:hover{background:var(--primary-light);color:var(--primary-dark)}
 .cart-link{position:relative}
 .cart-count{
   background:var(--primary);color:#fff;border-radius:999px;
@@ -1162,6 +1178,37 @@ body.role-admin .bnav-btn.admin-only{display:flex}
   font-size:12px;color:var(--text-light);line-height:1.7;
 }
 .demo-creds b{color:var(--text)}
+
+/* 登入 / 註冊 分頁切換 */
+.auth-tabs{
+  display:flex;gap:6px;margin:-6px -2px 16px;
+  border-bottom:1.5px solid var(--border);padding-bottom:0;
+}
+.auth-tab{
+  flex:1;padding:10px 0;background:none;border:none;
+  font-size:14px;font-weight:600;color:var(--text-light);
+  cursor:pointer;border-bottom:2.5px solid transparent;
+  margin-bottom:-1.5px;transition:all .2s;
+}
+.auth-tab:hover{color:var(--text)}
+.auth-tab.active{color:var(--primary);border-bottom-color:var(--primary)}
+.auth-pane{display:none}
+.auth-pane.active{display:block}
+
+/* 我的訂單卡片列表 */
+.my-order-card{
+  background:var(--white);border:1px solid var(--border);border-radius:var(--radius-md);
+  padding:14px 16px;margin-bottom:10px;cursor:pointer;transition:all .2s;
+  box-shadow:var(--shadow-sm);
+}
+.my-order-card:hover{transform:translateY(-1px);border-color:var(--primary-light);box-shadow:var(--shadow-md)}
+.moc-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;gap:10px}
+.moc-id{font-size:13px;font-weight:700;background:var(--bg);padding:3px 8px;border-radius:4px;color:var(--text)}
+.moc-meta{font-size:12px;color:var(--text-light);margin-bottom:4px}
+.moc-items{font-size:13px;color:var(--text);margin-bottom:8px;line-height:1.5}
+.moc-foot{display:flex;justify-content:space-between;align-items:center;padding-top:8px;border-top:1px dashed var(--border)}
+.moc-total{font-size:16px;font-weight:700;color:var(--sale);font-family:'Playfair Display',serif}
+.moc-view{font-size:12px;color:var(--primary);font-weight:600}
 .demo-creds code{background:var(--white);padding:1px 6px;border-radius:3px;font-family:Courier New,monospace;color:var(--pu);font-weight:700}
 
 /* ============================

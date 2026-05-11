@@ -68,14 +68,38 @@
     },
 
     /* ---------- Auth ---------- */
-    login(username, password) {
+    login(identifier, password) {
+      // 後端可接 username / email / identifier 三種,送 identifier 最通用
       return this._fetch('/auth/login', {
         method: 'POST',
-        body: JSON.stringify({ username, password }),
+        body: JSON.stringify({ identifier, password }),
+      });
+    },
+    register(data) {
+      // data: { email, password, displayName, phone?, defaultAddress? }
+      return this._fetch('/auth/register', {
+        method: 'POST',
+        body: JSON.stringify(data),
       });
     },
     me() {
       return this._fetch('/auth/me');
+    },
+    updateMe(data) {
+      return this._fetch('/auth/me', {
+        method: 'PATCH',
+        body: JSON.stringify(data),
+      });
+    },
+    changePassword(oldPassword, newPassword) {
+      return this._fetch('/auth/me/password', {
+        method: 'POST',
+        body: JSON.stringify({ oldPassword, newPassword }),
+      });
+    },
+    myOrders(params = {}) {
+      const q = new URLSearchParams(params).toString();
+      return this._fetch('/orders/mine' + (q ? '?' + q : ''));
     },
 
     /* ---------- 公開:商品 / 組合包 / 加價購 ---------- */
