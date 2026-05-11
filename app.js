@@ -302,7 +302,7 @@ async function loadMyOrders() {
       const itemPreview = (o.items || []).slice(0, 3).map(i => escHtml(i.name || '')).join('、');
       const moreItems = (o.items || []).length > 3 ? `…+${o.items.length - 3}` : '';
       return `
-        <div class="my-order-card" onclick="openOrderConfirmModal('${encodeURIComponent(o.orderId)}', true)">
+        <div class="my-order-card" onclick="openOrderConfirmModal('${escAttrJs(o.orderId)}', true)">
           <div class="moc-head">
             <code class="moc-id">${escHtml(o.orderId)}</code>
             <span class="order-status ${statusCls}">${escHtml(statusZh)}</span>
