@@ -1172,13 +1172,6 @@ body.role-admin .bnav-btn.admin-only{display:flex}
 .modal-btn.primary:hover{background:var(--primary-dark)}
 .modal-btn.outline{background:transparent;color:var(--text-light);border:1.5px solid var(--border)}
 .modal-btn.outline:hover{border-color:var(--text);color:var(--text)}
-.demo-creds{
-  background:var(--bg);border:1px dashed var(--border);
-  border-radius:var(--radius-md);padding:12px;margin-top:14px;
-  font-size:12px;color:var(--text-light);line-height:1.7;
-}
-.demo-creds b{color:var(--text)}
-
 /* 登入 / 註冊 分頁切換 */
 .auth-tabs{
   display:flex;gap:6px;margin:-6px -2px 16px;
@@ -1209,7 +1202,6 @@ body.role-admin .bnav-btn.admin-only{display:flex}
 .moc-foot{display:flex;justify-content:space-between;align-items:center;padding-top:8px;border-top:1px dashed var(--border)}
 .moc-total{font-size:16px;font-weight:700;color:var(--sale);font-family:'Playfair Display',serif}
 .moc-view{font-size:12px;color:var(--primary);font-weight:600}
-.demo-creds code{background:var(--white);padding:1px 6px;border-radius:3px;font-family:Courier New,monospace;color:var(--pu);font-weight:700}
 
 /* ============================
    PRODUCT IMAGE (real img)

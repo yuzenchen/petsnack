@@ -13,9 +13,8 @@
     role-dealer  經銷商    : 多了「經銷專區 / 經銷專屬 VIP 組合包 / 訂貨單」。
     role-admin   管理員    : 多了「後台管理」(新增/上下架/刪除組合包與加價購)。
 
-  Demo 測試帳號 (寫死於 DEMO_ACCOUNTS):
-    經銷商  : dealer / pet2026
-    管理員  : admin  / admin2026
+  帳號管理:admin / dealer 由後端 seed 建立,密碼透過 env (SEED_*) 設定。
+  一般會員 (role=customer) 透過 /auth/register 註冊。
 
   頁面結構 (SPA,以 .page.active 控制顯示):
     #page-shop    首頁 (Hero、分類、品質承諾、組合包、單品)
@@ -658,11 +657,6 @@
       <div class="modal-actions">
         <button class="modal-btn primary" onclick="doLogin()">登入</button>
         <button class="modal-btn outline" onclick="closeLoginModal()">取消</button>
-      </div>
-      <div class="demo-creds">
-        <b>📝 Demo 測試帳號：</b><br>
-        經銷商：<code>dealer</code> / <code>pet2026</code><br>
-        管理員：<code>admin</code> / <code>admin2026</code>
       </div>
     </div>
 
