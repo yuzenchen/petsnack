@@ -677,12 +677,33 @@ function switchPage(name, opts = {}) {
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
-function filterAndScroll(type) {
-  switchPage('shop');
-  const idxMap = { dog: 1, cat: 2, both: 3 };
-  const btn = document.querySelectorAll('.filter-btn')[idxMap[type]];
-  if (btn) filterProds(type, btn);
-  setTimeout(() => document.getElementById('products-grid').scrollIntoView({ behavior: 'smooth', block: 'start' }), 200);
+/* 頂部導覽「零食系列」下拉 */
+function toggleNavDropdown(e) {
+  if (e) e.stopPropagation();
+  const dd = document.querySelector('.nav-dropdown');
+  if (!dd) return;
+  const open = dd.classList.toggle('open');
+  const toggle = dd.querySelector('.nav-dropdown-toggle');
+  if (toggle) toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+}
+function closeNavDropdown() {
+  const dd = document.querySelector('.nav-dropdown');
+  if (!dd) return;
+  dd.classList.remove('open');
+  const toggle = dd.querySelector('.nav-dropdown-toggle');
+  if (toggle) toggle.setAttribute('aria-expanded', 'false');
+}
+document.addEventListener('click', (e) => {
+  const dd = document.querySelector('.nav-dropdown');
+  if (!dd || !dd.classList.contains('open')) return;
+  if (!dd.contains(e.target)) closeNavDropdown();
+});
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeNavDropdown(); });
+
+function goCategoryFromNav(key) {
+  closeNavDropdown();
+  if (typeof goCategory === 'function') goCategory(key);
+  else location.hash = '#/cat/' + key;
 }
 
 /* ============================ CATEGORY PAGE & HASH ROUTING ============================ */
