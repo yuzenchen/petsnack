@@ -3148,6 +3148,12 @@ function renderStockList() {
     const metaPanel = type === 'product' ? `
         <div class="prod-meta-edit" id="meta-${item.id}" style="display:none;grid-column:1/-1;padding:10px 14px;background:#fafafa;border-top:1px dashed var(--border);">
           <div style="display:grid;gap:8px;">
+            <label style="font-size:12px;color:var(--text-light)">商品名稱 <span style="color:var(--sale)">*</span>
+              <input type="text" class="meta-name" value="${escHtml(item.name || '')}" placeholder="商品名稱" maxlength="100" style="width:100%;padding:6px;border:1px solid var(--border);border-radius:4px;font:inherit">
+            </label>
+            <label style="font-size:12px;color:var(--text-light)">副標 / sub <span style="color:var(--text-light);font-weight:500">(卡片上的小字)</span>
+              <input type="text" class="meta-sub" value="${escHtml(item.sub || '')}" placeholder="例:鮮嫩高蛋白" maxlength="100" style="width:100%;padding:6px;border:1px solid var(--border);border-radius:4px;font:inherit">
+            </label>
             <label style="font-size:12px;color:var(--text-light)">圖片網址
               <input type="url" class="meta-imageUrl" value="${escHtml(item.imageUrl || '')}" placeholder="https://..." style="width:100%;padding:6px;border:1px solid var(--border);border-radius:4px;font:inherit">
             </label>
@@ -3297,9 +3303,15 @@ async function saveProductVariants(productId) {
 async function saveProductMeta(productId) {
   const panel = document.getElementById('meta-' + productId);
   if (!panel) return;
+  const name = panel.querySelector('.meta-name')?.value.trim() || '';
+  const sub = panel.querySelector('.meta-sub')?.value.trim() || '';
   const imageUrl = panel.querySelector('.meta-imageUrl').value.trim();
   const description = panel.querySelector('.meta-description').value.trim();
   const endsAtRaw = panel.querySelector('.meta-endsAt')?.value || '';
+
+  // 客端先驗 (避免送無效資料)
+  if (!name) { showToast('商品名稱不可為空', false); return; }
+
   // 空值送 null 給後端清除限時;有值轉 ISO 字串
   const endsAt = endsAtRaw ? new Date(endsAtRaw).toISOString() : null;
 
@@ -3310,7 +3322,7 @@ async function saveProductMeta(productId) {
 
   // 只有當 endsAt 真的變動時才強制 active=true
   // (避免使用者只改圖片/描述時也把已下架商品自動上架)
-  const payload = { imageUrl, description, endsAt };
+  const payload = { name, sub, imageUrl, description, endsAt };
   if (endsAtChanged) payload.active = true;
 
   try {
