@@ -736,8 +736,9 @@ async function loadCategoryImages() {
 function renderAdminCategoryImages() {
   const wrap = document.getElementById('admin-category-images');
   if (!wrap) return;
-  wrap.innerHTML = ['dog', 'cat', 'both'].map((key) => {
+  wrap.innerHTML = TYPE_ORDER.map((key) => {
     const meta = CATEGORY_META[key];
+    if (!meta) return '';
     const url = CATEGORY_IMAGES[key] || '';
     const previewHtml = url
       ? `<img src="${escHtml(url)}" alt="" class="cat-image-preview-img" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"><div class="cat-image-preview-fallback" style="display:none">⚠ 圖片載入失敗</div>`
@@ -818,7 +819,7 @@ function renderCategoryPage(type) {
   }
 
   const grid = document.getElementById('cat-products-grid');
-  const list = ALL_PRODUCTS.filter(p => p.type === type || (type !== 'both' && p.type === 'both'));
+  const list = ALL_PRODUCTS.filter(p => p.type === type);
   if (!list.length) {
     grid.innerHTML = '<p style="grid-column:1/-1;text-align:center;color:var(--text-light);padding:40px">此分類目前無商品</p>';
     return;
@@ -1219,7 +1220,7 @@ function filterProds(type, btn) {
 function renderProducts() {
   const grid = document.getElementById('products-grid');
   let list = currentFilter === 'all' ? ALL_PRODUCTS
-    : ALL_PRODUCTS.filter(p => p.type === currentFilter || p.type === 'both');
+    : ALL_PRODUCTS.filter(p => p.type === currentFilter);
   list = list.filter(p => matchesSearchQuery(p, currentSearchQuery));
   const lbl = { new: '新品', hot: '熱賣', sale: '優惠' };
   if (!list.length) {
@@ -3108,13 +3109,14 @@ async function loadDashboardStats() {
   try {
     const { stats } = await Api.adminStats();
     const setText = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
-    setText('stat-prod', stats.catalog.products);
-    setText('stat-bundle', stats.catalog.bundlesPublic);
-    setText('stat-dealer', stats.catalog.bundlesDealer);
-    setText('stat-addon', stats.catalog.addons);
-    setText('stat-revenue', 'NT$' + (stats.month.revenue || 0).toLocaleString());
-    setText('stat-pending', stats.pendingShipping);
-    setText('stat-lowstock', stats.lowStockCount ?? 0);
+    const safe = (fn) => { try { fn(); } catch (_) { /* 單格失敗不影響其他 */ } };
+    safe(() => setText('stat-prod', stats?.catalog?.products ?? 0));
+    safe(() => setText('stat-bundle', stats?.catalog?.bundlesPublic ?? 0));
+    safe(() => setText('stat-dealer', stats?.catalog?.bundlesDealer ?? 0));
+    safe(() => setText('stat-addon', stats?.catalog?.addons ?? 0));
+    safe(() => setText('stat-revenue', 'NT$' + (stats?.month?.revenue || 0).toLocaleString()));
+    safe(() => setText('stat-pending', stats?.pendingShipping ?? 0));
+    safe(() => setText('stat-lowstock', stats?.lowStockCount ?? 0));
     // 警示卡視覺強調
     const card = document.getElementById('stat-lowstock-card');
     if (card) card.classList.toggle('alert', (stats.lowStockCount ?? 0) > 0);
