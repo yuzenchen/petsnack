@@ -684,14 +684,18 @@ function toggleNavDropdown(e) {
   if (!dd) return;
   const open = dd.classList.toggle('open');
   const toggle = dd.querySelector('.nav-dropdown-toggle');
+  const menu = dd.querySelector('.nav-dropdown-menu');
   if (toggle) toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+  if (menu) { if (open) menu.removeAttribute('hidden'); else menu.setAttribute('hidden', ''); }
 }
 function closeNavDropdown() {
   const dd = document.querySelector('.nav-dropdown');
   if (!dd) return;
   dd.classList.remove('open');
   const toggle = dd.querySelector('.nav-dropdown-toggle');
+  const menu = dd.querySelector('.nav-dropdown-menu');
   if (toggle) toggle.setAttribute('aria-expanded', 'false');
+  if (menu) menu.setAttribute('hidden', '');
 }
 document.addEventListener('click', (e) => {
   const dd = document.querySelector('.nav-dropdown');

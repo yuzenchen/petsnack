@@ -86,18 +86,18 @@
     </a>
     <nav class="nav-links" role="tablist" aria-label="主導覽">
       <button id="nav-link-shop" role="tab" aria-selected="true" class="active" onclick="switchPage('shop')">首頁</button>
-      <button onclick="bundleScroll()">超值組合</button>
       <div class="nav-dropdown">
         <button class="nav-dropdown-toggle" aria-haspopup="true" aria-expanded="false" onclick="toggleNavDropdown(event)">
           零食系列 <span class="nav-caret" aria-hidden="true">▾</span>
         </button>
-        <div class="nav-dropdown-menu" role="menu">
+        <div class="nav-dropdown-menu" role="menu" hidden>
           <button role="menuitem" onclick="goCategoryFromNav('easy')"><span class="ndm-emoji">🍮</span><span><strong>無腦直接投餵</strong><small>EASY FEED</small></span></button>
           <button role="menuitem" onclick="goCategoryFromNav('mild')"><span class="ndm-emoji">🍪</span><span><strong>軟硬剛剛好</strong><small>SOFT CHEW</small></span></button>
           <button role="menuitem" onclick="goCategoryFromNav('medium')"><span class="ndm-emoji">🥖</span><span><strong>有點硬你考慮</strong><small>CONSIDER CHEW</small></span></button>
           <button role="menuitem" onclick="goCategoryFromNav('hard')"><span class="ndm-emoji">🦴</span><span><strong>我偏硬你慎思</strong><small>HARD CHEW</small></span></button>
         </div>
       </div>
+      <button onclick="bundleScroll()">超值組合</button>
       <button id="nav-link-dealer" class="dealer-only" role="tab" aria-selected="false" onclick="switchPage('dealer')">經銷專區</button>
       <button id="nav-link-admin" class="admin-only" role="tab" aria-selected="false" onclick="switchPage('admin')">後台管理</button>
     </nav>
