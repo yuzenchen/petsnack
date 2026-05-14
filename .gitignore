@@ -39,3 +39,6 @@ png/
 
 # 後端是另一個 repo (petsnack-backend),不要被前端 repo 追蹤
 wama-house-backend/
+
+# 其他在這個資料夾下的獨立 repo,不要被收編
+cve-report-analyzer/
