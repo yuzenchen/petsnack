@@ -686,17 +686,38 @@ function filterAndScroll(type) {
 }
 
 /* ============================ CATEGORY PAGE & HASH ROUTING ============================ */
+/* 2026-05 新分類:依「啃咬硬度」分 4 級 (Q1=A:新品上市走 badge 不獨立) */
 const CATEGORY_META = {
-  dog:  { eyebrow: 'DOG TREATS',       title: '狗狗鮮肉零食系列', emoji: '🐶',
-          desc: '精選低脂肉品,適合日常訓練。使用當日屠宰新鮮肉品,讓食材本身的鮮味,訴說產品的用心。' },
-  cat:  { eyebrow: 'CAT TREATS',       title: '貓咪海鮮零食系列', emoji: '🐱',
-          desc: '挑選硬度適中食材,人工精細修除油膜,讓正在飲食控制中的貓咪也能享受開心啃咬的樂趣。' },
-  both: { eyebrow: 'UNIVERSAL TREATS', title: '毛孩通用零食系列', emoji: '🌟',
-          desc: '狗狗貓咪都適用的精選配方,溫和不刺激,是多寵物家庭的理想選擇。' },
+  easy: {
+    eyebrow: 'EASY FEED',
+    title:   '無腦直接投餵',
+    emoji:   '🍮',
+    desc:    '質地最柔軟,毛孩一口吞下不費力,適合幼齡 / 老齡 / 牙口不好的毛孩。',
+  },
+  mild: {
+    eyebrow: 'MILD CHEW',
+    title:   '微啃咬',
+    emoji:   '🍪',
+    desc:    '入口會有一點點需要咬的感覺,毛孩既能享受啃咬樂趣又不費勁。',
+  },
+  medium: {
+    eyebrow: 'CONSIDER CHEW',
+    title:   '有點硬你考慮',
+    emoji:   '🥖',
+    desc:    '硬度中等,適合愛啃咬、牙口正常的毛孩,啃食過程能清潔牙齒。',
+  },
+  hard: {
+    eyebrow: 'HARD CHEW',
+    title:   '我偏硬你慎思',
+    emoji:   '🦴',
+    desc:    '高硬度耐啃,給牙口強壯、喜愛挑戰的毛孩。可長時間啃食。',
+  },
 };
+/* 新分類 key 順序 (UI 顯示時用) */
+const TYPE_ORDER = ['easy', 'mild', 'medium', 'hard'];
 
 /* admin 可上傳分類橫幅圖,fetch 後存這裡;空字串 = 沿用 emoji */
-let CATEGORY_IMAGES = { dog: '', cat: '', both: '' };
+let CATEGORY_IMAGES = { easy: '', mild: '', medium: '', hard: '' };
 
 async function loadCategoryImages() {
   try {
@@ -761,7 +782,7 @@ async function clearCategoryImage(key) {
 
 /* 把 CATEGORY_IMAGES 套用到首頁三個系列橫幅 (csr-img-dog/cat/both) */
 function applyCategoryImagesToShowcase() {
-  ['dog', 'cat', 'both'].forEach((key) => {
+  ['easy', 'mild', 'medium', 'hard'].forEach((key) => {
     const wrap = document.getElementById('csr-img-' + key);
     if (!wrap) return;
     const url = CATEGORY_IMAGES[key];
@@ -809,7 +830,7 @@ function renderCategoryPage(type) {
 }
 
 function applyHashRoute() {
-  const m = (location.hash || '').match(/^#\/cat\/(dog|cat|both)$/);
+  const m = (location.hash || '').match(/^#\/cat\/(easy|mild|medium|hard)$/);
   if (m) {
     switchPage('category', { skipHashSync: true });
     renderCategoryPage(m[1]);
@@ -1234,7 +1255,13 @@ function renderBundleDealer() {
 /* ============================================================
    PRODUCT DETAIL MODAL (項目 1)
    ============================================================ */
-const PET_LABEL = { dog: '🐶 狗狗', cat: '🐱 貓咪', both: '🌟 通用' };
+/* 2026-05 改成 4 級啃咬硬度;PET_LABEL 名字保留以免到處改 */
+const PET_LABEL = {
+  easy:   '🍮 無腦直接投餵',
+  mild:   '🍪 微啃咬',
+  medium: '🥖 有點硬你考慮',
+  hard:   '🦴 我偏硬你慎思',
+};
 const BADGE_LABEL = { new: '新品', hot: '熱賣', sale: '優惠' };
 
 function openProductModal(itemType, id) {
@@ -2902,8 +2929,9 @@ function _getImportCsv() {
 
 function downloadProductTemplate() {
   const header = 'name,sub,emoji,imageUrl,description,price,orig,badge,type,stock,lowStockThreshold,trackStock';
-  const example = '雞肉條,鮮嫩高蛋白,🍗,https://res.cloudinary.com/xxx/image/upload/abc.jpg,純台灣雞胸肉烘烤,240,300,hot,dog,50,5,true';
-  const example2 = '鮪魚凍乾,海鮮配方,🐟,https://res.cloudinary.com/xxx/image/upload/def.jpg,,260,,,cat,30,5,true';
+  // type 4 種: easy / mild / medium / hard (對應啃咬硬度)
+  const example = '雞肉條,鮮嫩高蛋白,🍗,https://res.cloudinary.com/xxx/image/upload/abc.jpg,純台灣雞胸肉烘烤,240,300,hot,mild,50,5,true';
+  const example2 = '潔牙骨,耐啃硬條,🦴,https://res.cloudinary.com/xxx/image/upload/def.jpg,,260,,,hard,30,5,true';
   const csv = '﻿' + [header, example, example2].join('\n'); // BOM 給 Excel 開能正確 UTF-8
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
   const url = URL.createObjectURL(blob);
@@ -3154,6 +3182,14 @@ function renderStockList() {
             <label style="font-size:12px;color:var(--text-light)">副標 / sub <span style="color:var(--text-light);font-weight:500">(卡片上的小字)</span>
               <input type="text" class="meta-sub" value="${escHtml(item.sub || '')}" placeholder="例:鮮嫩高蛋白" maxlength="100" style="width:100%;padding:6px;border:1px solid var(--border);border-radius:4px;font:inherit">
             </label>
+            <label style="font-size:12px;color:var(--text-light)">分類 (啃咬硬度)
+              <select class="meta-type" style="width:100%;padding:6px;border:1px solid var(--border);border-radius:4px;font:inherit;background:var(--white)">
+                <option value="easy"   ${item.type === 'easy'   ? 'selected' : ''}>🍮 無腦直接投餵</option>
+                <option value="mild"   ${item.type === 'mild'   ? 'selected' : ''}>🍪 微啃咬</option>
+                <option value="medium" ${item.type === 'medium' ? 'selected' : ''}>🥖 有點硬你考慮</option>
+                <option value="hard"   ${item.type === 'hard'   ? 'selected' : ''}>🦴 我偏硬你慎思</option>
+              </select>
+            </label>
             <label style="font-size:12px;color:var(--text-light)">圖片網址
               <input type="url" class="meta-imageUrl" value="${escHtml(item.imageUrl || '')}" placeholder="https://..." style="width:100%;padding:6px;border:1px solid var(--border);border-radius:4px;font:inherit">
             </label>
@@ -3305,6 +3341,7 @@ async function saveProductMeta(productId) {
   if (!panel) return;
   const name = panel.querySelector('.meta-name')?.value.trim() || '';
   const sub = panel.querySelector('.meta-sub')?.value.trim() || '';
+  const typeVal = panel.querySelector('.meta-type')?.value || '';
   const imageUrl = panel.querySelector('.meta-imageUrl').value.trim();
   const description = panel.querySelector('.meta-description').value.trim();
   const endsAtRaw = panel.querySelector('.meta-endsAt')?.value || '';
@@ -3323,6 +3360,7 @@ async function saveProductMeta(productId) {
   // 只有當 endsAt 真的變動時才強制 active=true
   // (避免使用者只改圖片/描述時也把已下架商品自動上架)
   const payload = { name, sub, imageUrl, description, endsAt };
+  if (typeVal && ['easy','mild','medium','hard'].includes(typeVal)) payload.type = typeVal;
   if (endsAtChanged) payload.active = true;
 
   try {

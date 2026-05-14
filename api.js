@@ -232,6 +232,12 @@
         { method: 'PATCH', body: JSON.stringify({ stock }) }
       );
     },
+    adminBulkSetType(productIds, type) {
+      return this._fetch('/admin/products/bulk-type', {
+        method: 'POST',
+        body: JSON.stringify({ productIds, type }),
+      });
+    },
     adminImportProducts(csv, dryRun) {
       return this._fetch('/admin/products/import', {
         method: 'POST',
