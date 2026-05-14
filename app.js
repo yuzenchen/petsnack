@@ -2660,6 +2660,82 @@ function shippingMethodLabel(m) {
   return _SHIPPING_METHOD_LABEL[m] || m || '-';
 }
 
+/* ============================ ADMIN: 商品刪除 + 批次清理 ============================ */
+async function adminDeleteProduct(productId, name) {
+  if (!confirm(`確定刪除商品「${name}」(ID ${productId})?\n此動作不可復原。`)) return;
+  try {
+    await Api.adminDeleteProduct(productId);
+    showToast(`✓ 已刪除「${name}」`, true);
+    if (typeof loadStockList === 'function') loadStockList();
+    if (typeof reloadCatalog === 'function') reloadCatalog();
+    if (typeof reloadAdminLists === 'function') reloadAdminLists();
+  } catch (e) {
+    showToast('刪除失敗:' + (e.message || ''), false);
+  }
+}
+
+/* 一鍵清除測試資料: stock>0 商品 + 全部組合包 (預設條件) */
+async function adminBulkCleanupPreview() {
+  const out = document.getElementById('cleanup-result');
+  if (out) out.innerHTML = '<div class="bundle-admin-empty">分析中...</div>';
+  try {
+    const r = await Api.adminBulkCleanup({ dryRun: true });
+    if (out) out.innerHTML = _renderCleanupResult(r, /* preview */ true);
+    showToast(`預覽:將刪 ${r.summary.productsToDelete} 件商品 + ${r.summary.bundlesToDelete} 個組合包`, true);
+  } catch (e) {
+    if (out) out.innerHTML = `<div style="color:var(--red);font-weight:700">⚠ 預覽失敗:${escHtml(e.message || '')}</div>`;
+  }
+}
+
+async function adminBulkCleanupRun() {
+  if (!confirm('⚠ 確認刪除「所有 stock > 0 的單品」+「所有組合包」?\n\n此動作不可復原。建議先按「預覽」確認清單。')) return;
+  const out = document.getElementById('cleanup-result');
+  if (out) out.innerHTML = '<div class="bundle-admin-empty">處理中...</div>';
+  try {
+    const r = await Api.adminBulkCleanup({ dryRun: false });
+    if (out) out.innerHTML = _renderCleanupResult(r, /* preview */ false);
+    showToast(`✓ 已刪 ${r.summary.deletedProducts} 件商品 + ${r.summary.deletedBundles} 個組合包`, true);
+    if (typeof loadStockList === 'function') loadStockList();
+    if (typeof reloadCatalog === 'function') reloadCatalog();
+    if (typeof reloadAdminLists === 'function') reloadAdminLists();
+  } catch (e) {
+    if (out) out.innerHTML = `<div style="color:var(--red);font-weight:700">⚠ 清理失敗:${escHtml(e.message || '')}</div>`;
+    showToast('清理失敗:' + (e.message || ''), false);
+  }
+}
+
+function _renderCleanupResult(r, isPreview) {
+  const { summary, products, bundles } = r;
+  const tag = isPreview
+    ? '<span class="bli-vis dealer">預覽模式</span>'
+    : '<span class="bli-vis public">已刪除</span>';
+  const prodList = products.length ? `
+    <div style="margin-top:10px">
+      <div style="font-weight:700;margin-bottom:6px">📦 商品 (${products.length})</div>
+      <ul style="font-size:12px;color:var(--text-light);padding-left:20px;line-height:1.7;max-height:200px;overflow-y:auto">
+        ${products.slice(0, 50).map(p =>
+          `<li>ID ${p.productId} <code>${escHtml(p.name)}</code> · 庫存 ${p.stock}</li>`
+        ).join('')}
+        ${products.length > 50 ? `<li>...還有 ${products.length - 50} 件</li>` : ''}
+      </ul>
+    </div>` : '<div style="margin-top:10px;color:var(--text-light)">沒有 stock > 0 的商品</div>';
+  const bundleList = bundles.length ? `
+    <div style="margin-top:10px">
+      <div style="font-weight:700;margin-bottom:6px">🎁 組合包 (${bundles.length})</div>
+      <ul style="font-size:12px;color:var(--text-light);padding-left:20px;line-height:1.7;max-height:200px;overflow-y:auto">
+        ${bundles.map(b =>
+          `<li>ID ${b.bundleId} <code>${escHtml(b.name)}</code></li>`
+        ).join('')}
+      </ul>
+    </div>` : '<div style="margin-top:10px;color:var(--text-light)">沒有組合包</div>';
+  return `
+    <div style="background:var(--bg);padding:12px;border-radius:6px;font-size:13px">
+      <div style="font-weight:700">${tag} 商品 ${products.length} 件 · 組合包 ${bundles.length} 個</div>
+      ${prodList}
+      ${bundleList}
+    </div>`;
+}
+
 /* ============================ ADMIN: 商品批次匯入 ============================ */
 function switchImportTab(which) {
   const isFile = which === 'file';
@@ -2955,7 +3031,8 @@ function renderStockList() {
           </div>
         </div>` : '';
     const metaToggle = type === 'product'
-      ? `<button class="pill-btn gray" onclick="toggleProductMeta(${item.id})" title="編輯圖片/描述">✎</button>`
+      ? `<button class="pill-btn gray" onclick="toggleProductMeta(${item.id})" title="編輯圖片/描述">✎</button>
+         <button class="pill-btn" style="background:var(--red-light);color:var(--red)" onclick="adminDeleteProduct(${item.id}, '${escAttrJs(item.name)}')" title="刪除商品">🗑</button>`
       : '';
     return `
       <div class="bundle-list-item stock-row ${status === 'ok' ? '' : 'stock-warn'}" style="display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:10px;">

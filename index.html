@@ -417,6 +417,25 @@
     <div id="bundle-admin-list"></div>
   </div>
 
+  <!-- 一鍵清除測試資料 -->
+  <div class="admin-card" id="cleanup-admin-card">
+    <div class="admin-card-hd">
+      <h3>🧹 清除測試資料</h3>
+      <span class="admin-hint">刪除 stock > 0 的商品 + 全部組合包</span>
+    </div>
+    <div style="padding:14px 20px">
+      <div style="font-size:12px;color:var(--text-light);line-height:1.7;margin-bottom:10px">
+        匯入正式商品後,把測試期遺留的商品(有現貨)+ 所有舊組合包一次清掉。<br>
+        ⚠ 不可復原,建議先按「預覽」確認名單。單筆刪除也可在下方庫存列表的 🗑 按鈕。
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="pill-btn gray" onclick="adminBulkCleanupPreview()">👀 預覽要刪的清單</button>
+        <button class="pill-btn" style="background:var(--red);color:#fff" onclick="adminBulkCleanupRun()">⚠ 確認執行清除</button>
+      </div>
+      <div id="cleanup-result" style="margin-top:12px"></div>
+    </div>
+  </div>
+
   <!-- 批次匯入商品 (CSV) -->
   <div class="admin-card" id="import-admin-card">
     <div class="admin-card-hd">

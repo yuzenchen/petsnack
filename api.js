@@ -226,6 +226,17 @@
         body: JSON.stringify({ csv, dryRun: !!dryRun }),
       });
     },
+    adminDeleteProduct(productId) {
+      return this._fetch('/admin/products/' + encodeURIComponent(productId), {
+        method: 'DELETE',
+      });
+    },
+    adminBulkCleanup(opts = {}) {
+      return this._fetch('/admin/cleanup', {
+        method: 'POST',
+        body: JSON.stringify(opts),
+      });
+    },
     adminUpdateAddonStock(addonId, stock) {
       return this._fetch('/admin/addons/' + encodeURIComponent(addonId) + '/stock', {
         method: 'PATCH',
