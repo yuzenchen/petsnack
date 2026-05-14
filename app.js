@@ -3163,8 +3163,9 @@ function renderStockList() {
           </div>
         </div>` : '';
 
-    /* 多規格商品 — 規格管理面板 + 主庫存輸入框 disabled (改在 panel 內逐項編輯) */
-    const variantPanel = (type === 'product' && hasVariants(item)) ? `
+    /* 規格管理面板:所有商品都渲染 (預設隱藏),
+       讓「沒設過 variants 的商品」點規格按鈕時也能加第一筆 */
+    const variantPanel = (type === 'product') ? `
         <div class="variant-edit-panel" id="variants-${item.id}" style="display:none;grid-column:1/-1;padding:10px 14px;background:#FFF5EE;border-top:1px dashed var(--border)">
           ${_renderAdminVariantsEditor(item)}
         </div>` : '';
@@ -3219,14 +3220,15 @@ function toggleProductMeta(productId) {
   panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
 }
 
-/* ===== Admin: 多規格管理面板 ===== */
+/* ===== Admin: 多規格管理面板 =====
+   panel 在 renderStockList 渲染時已經寫進 DOM (含編輯器初始 HTML),
+   點按鈕只負責 show/hide。
+   若 panel 找不到 → 可能舊版 admin 介面或 stock list 還沒載入,silent log 不擋。 */
 function toggleVariantsPanel(productId) {
   const panel = document.getElementById('variants-' + productId);
-  if (!panel) return;
-  // 如果還沒有 variant,初始化空容器(需要 product 在 cache 裡)
-  if (!hasVariants(_adminStockCache?.products?.find(p => p.id === productId)) && panel.innerHTML.trim().length < 50) {
-    const item = _adminStockCache?.products?.find(p => p.id === productId);
-    if (item) panel.innerHTML = _renderAdminVariantsEditor(item);
+  if (!panel) {
+    console.warn('toggleVariantsPanel: panel 不存在,productId =', productId);
+    return;
   }
   panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
 }
