@@ -2660,6 +2660,118 @@ function shippingMethodLabel(m) {
   return _SHIPPING_METHOD_LABEL[m] || m || '-';
 }
 
+/* ============================ ADMIN: 商品批次匯入 ============================ */
+function switchImportTab(which) {
+  const isFile = which === 'file';
+  document.getElementById('imp-tab-file')?.classList.toggle('active', isFile);
+  document.getElementById('imp-tab-paste')?.classList.toggle('active', !isFile);
+  document.getElementById('imp-pane-file')?.classList.toggle('active', isFile);
+  document.getElementById('imp-pane-paste')?.classList.toggle('active', !isFile);
+}
+
+let _importCsvText = '';
+
+function onImportFileChange() {
+  const inp = document.getElementById('imp-file');
+  const file = inp?.files?.[0];
+  if (!file) { _importCsvText = ''; return; }
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    _importCsvText = e.target.result || '';
+    showToast(`✓ 已讀取 ${file.name}`, true);
+  };
+  reader.onerror = () => showToast('讀取檔案失敗', false);
+  reader.readAsText(file, 'utf-8');
+}
+
+function _getImportCsv() {
+  // 優先用上傳檔案,沒有就用貼上的
+  if (_importCsvText && document.getElementById('imp-pane-file')?.classList.contains('active')) {
+    return _importCsvText;
+  }
+  return document.getElementById('imp-csv')?.value || '';
+}
+
+function downloadProductTemplate() {
+  const header = 'name,sub,emoji,imageUrl,description,price,orig,badge,type,stock,lowStockThreshold,trackStock';
+  const example = '雞肉條,鮮嫩高蛋白,🍗,https://res.cloudinary.com/xxx/image/upload/abc.jpg,純台灣雞胸肉烘烤,240,300,hot,dog,50,5,true';
+  const example2 = '鮪魚凍乾,海鮮配方,🐟,https://res.cloudinary.com/xxx/image/upload/def.jpg,,260,,,cat,30,5,true';
+  const csv = '﻿' + [header, example, example2].join('\n'); // BOM 給 Excel 開能正確 UTF-8
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'wama-products-template.csv';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+async function previewProductImport() {
+  const csv = _getImportCsv();
+  if (!csv.trim()) { showToast('請先上傳 CSV 或貼上內容', false); return; }
+  await _runImport(csv, true);
+}
+
+async function confirmProductImport() {
+  const csv = _getImportCsv();
+  if (!csv.trim()) { showToast('請先上傳 CSV 或貼上內容', false); return; }
+  if (!confirm('確認要匯入嗎?dryRun 預覽結果都符合預期再執行。')) return;
+  const ok = await _runImport(csv, false);
+  if (ok) {
+    // 重整商品列表
+    if (typeof loadStockList === 'function') loadStockList();
+    if (typeof reloadCatalog === 'function') reloadCatalog();
+  }
+}
+
+async function _runImport(csv, dryRun) {
+  const out = document.getElementById('imp-result');
+  if (out) out.innerHTML = '<div class="bundle-admin-empty">處理中...</div>';
+  try {
+    const r = await Api.adminImportProducts(csv, dryRun);
+    if (out) out.innerHTML = _renderImportResult(r);
+    showToast(
+      dryRun
+        ? `預覽:預計成功 ${r.summary.created} / 失敗 ${r.summary.failed} / 共 ${r.summary.total}`
+        : `✓ 已匯入 ${r.summary.created} 件,失敗 ${r.summary.failed} 件`,
+      r.summary.failed === 0
+    );
+    return r.summary.failed === 0;
+  } catch (e) {
+    if (out) out.innerHTML = `<div style="color:var(--red);font-weight:700">⚠ 匯入失敗:${escHtml(e.message || '')}</div>`;
+    showToast(e.message || '匯入失敗', false);
+    return false;
+  }
+}
+
+function _renderImportResult(r) {
+  const { summary, created, failed } = r;
+  const tag = summary.dryRun ? '<span class="bli-vis dealer">預覽模式</span>' : '<span class="bli-vis public">已寫入</span>';
+  const failedHtml = failed.length ? `
+    <div style="margin-top:10px">
+      <div style="font-weight:700;color:var(--red);margin-bottom:6px">❌ 失敗 ${failed.length} 筆</div>
+      <ul style="font-size:12px;color:var(--text-light);padding-left:20px;line-height:1.8;max-height:200px;overflow-y:auto">
+        ${failed.map(f => `<li>第 ${f.row} 行 — ${escHtml(f.error)}<br><code style="font-size:11px;color:var(--text-light)">${escHtml(JSON.stringify(f.data).slice(0, 120))}</code></li>`).join('')}
+      </ul>
+    </div>` : '';
+  const createdHtml = created.length ? `
+    <div style="margin-top:10px">
+      <div style="font-weight:700;color:var(--gr);margin-bottom:6px">✅ 成功 ${created.length} 筆</div>
+      <ul style="font-size:12px;color:var(--text-light);padding-left:20px;line-height:1.8;max-height:200px;overflow-y:auto">
+        ${created.slice(0, 30).map(c => `<li>第 ${c.row} 行 — ID ${c.productId} <code>${escHtml(c.name)}</code></li>`).join('')}
+        ${created.length > 30 ? `<li>...還有 ${created.length - 30} 筆</li>` : ''}
+      </ul>
+    </div>` : '';
+  return `
+    <div style="background:var(--bg);padding:12px;border-radius:6px;font-size:13px">
+      <div style="font-weight:700">${tag} 共 ${summary.total} 筆 · 成功 ${summary.created} / 失敗 ${summary.failed}</div>
+      ${failedHtml}
+      ${createdHtml}
+    </div>`;
+}
+
 async function adminMarkPaid(orderIdEnc) {
   const orderId = decodeURIComponent(orderIdEnc);
   if (!confirm(`確定已收到訂單 ${orderId} 的轉帳款項?\n標記後若是超商取貨,會自動建立 ECPay 物流單`)) return;

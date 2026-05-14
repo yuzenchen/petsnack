@@ -417,6 +417,41 @@
     <div id="bundle-admin-list"></div>
   </div>
 
+  <!-- 批次匯入商品 (CSV) -->
+  <div class="admin-card" id="import-admin-card">
+    <div class="admin-card-hd">
+      <h3>📥 批次匯入商品</h3>
+      <button class="pill-btn" onclick="downloadProductTemplate()" title="下載 CSV 範本檔">📄 下載範本</button>
+    </div>
+    <div style="padding:16px 20px">
+      <div style="font-size:12px;color:var(--text-light);margin-bottom:10px;line-height:1.7">
+        必填欄位:<code>name</code> / <code>price</code> / <code>type</code>(dog/cat/both)<br>
+        選填:<code>sub</code> / <code>emoji</code> / <code>imageUrl</code> / <code>description</code> /
+        <code>orig</code> / <code>badge</code>(hot/new/sale) /
+        <code>stock</code> / <code>lowStockThreshold</code> / <code>trackStock</code><br>
+        圖片請先上傳到 Cloudinary / 任何圖床,把網址貼進 <code>imageUrl</code> 欄。
+      </div>
+      <div class="import-tabs" role="tablist" style="display:flex;gap:6px;margin-bottom:8px">
+        <button class="auth-tab active" id="imp-tab-file"  role="tab"
+                onclick="switchImportTab('file')">📁 上傳檔案</button>
+        <button class="auth-tab" id="imp-tab-paste" role="tab"
+                onclick="switchImportTab('paste')">📋 貼上內容</button>
+      </div>
+      <div id="imp-pane-file" class="auth-pane active">
+        <input type="file" id="imp-file" accept=".csv,text/csv" onchange="onImportFileChange()">
+      </div>
+      <div id="imp-pane-paste" class="auth-pane">
+        <textarea id="imp-csv" rows="6" placeholder="name,price,type,...&#10;雞肉條,240,dog,..."
+                  style="width:100%;font-family:'Courier New',monospace;font-size:12px;padding:8px;border:1px solid var(--border);border-radius:6px;resize:vertical"></textarea>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
+        <button class="pill-btn gray" onclick="previewProductImport()">👀 預覽 (不寫入)</button>
+        <button class="pill-btn green" onclick="confirmProductImport()">✅ 確認匯入</button>
+      </div>
+      <div id="imp-result" style="margin-top:12px"></div>
+    </div>
+  </div>
+
   <!-- 商品庫存管理 -->
   <div class="admin-card" id="stock-admin-card">
     <div class="admin-card-hd">

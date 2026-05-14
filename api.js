@@ -220,6 +220,12 @@
         body: JSON.stringify({ stock }),
       });
     },
+    adminImportProducts(csv, dryRun) {
+      return this._fetch('/admin/products/import', {
+        method: 'POST',
+        body: JSON.stringify({ csv, dryRun: !!dryRun }),
+      });
+    },
     adminUpdateAddonStock(addonId, stock) {
       return this._fetch('/admin/addons/' + encodeURIComponent(addonId) + '/stock', {
         method: 'PATCH',
