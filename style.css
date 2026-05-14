@@ -435,6 +435,59 @@ body.searching #page-shop > .section-title{display:none}
 .product-badge.new{background:var(--gr)}
 .product-badge.hot{background:#E8784A}
 
+/* 多規格商品 — 卡片右上 + 詳情選擇器 */
+.variant-badge{
+  position:absolute;top:10px;right:10px;z-index:2;
+  background:#5C7E8F;color:#fff;
+  font-size:10px;font-weight:700;letter-spacing:.5px;
+  padding:3px 8px;border-radius:4px;
+}
+/* 倒數 badge 跟 variant badge 同位置時讓 countdown 往下移 */
+.product-card .variant-badge + .countdown-timer{top:38px}
+
+.pmd-variant-selector{
+  margin:14px 0;padding:12px;
+  background:var(--bg);border-radius:8px;border:1px solid var(--border);
+}
+.pmd-variant-label{
+  font-size:12px;font-weight:700;color:var(--text-light);
+  letter-spacing:1px;margin-bottom:8px;
+}
+.pmd-variant-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+@media(max-width:480px){.pmd-variant-grid{grid-template-columns:1fr 1fr}}
+.pmd-variant-opt{
+  display:flex;flex-direction:column;align-items:center;gap:3px;
+  padding:10px 6px;background:var(--white);
+  border:1.5px solid var(--border);border-radius:8px;
+  cursor:pointer;transition:all .2s;font:inherit;line-height:1.3;
+}
+.pmd-variant-opt:hover:not(:disabled){border-color:var(--primary-light);background:var(--primary-light)}
+.pmd-variant-opt.selected{
+  border-color:var(--primary);background:var(--primary-light);
+  box-shadow:0 0 0 1px var(--primary) inset;
+}
+.pmd-variant-opt.is-out{opacity:.55;cursor:not-allowed;background:var(--bg)}
+.pvo-label{font-size:13px;font-weight:700;color:var(--text)}
+.pvo-price{font-size:14px;font-weight:700;color:var(--sale);font-family:'Playfair Display',serif}
+.pmd-variant-opt.selected .pvo-price{color:var(--primary-dark)}
+.pvo-stock{font-size:10px;color:var(--text-light);letter-spacing:1px}
+.pmd-variant-opt.is-out .pvo-stock{color:var(--red);font-weight:700}
+
+/* Admin 規格編輯面板 */
+.variant-edit-rows{display:flex;flex-direction:column;gap:6px}
+.variant-row{
+  display:grid;grid-template-columns:1.5fr 1fr 1fr auto;gap:6px;align-items:center;
+}
+.variant-row input{
+  padding:7px 9px;border:1px solid var(--border);border-radius:5px;
+  font:inherit;font-size:13px;background:var(--white);
+}
+.variant-row input:focus{outline:none;border-color:var(--primary)}
+@media(max-width:540px){
+  .variant-row{grid-template-columns:1fr 1fr;gap:5px}
+  .variant-row .ve-label{grid-column:1/-1}
+}
+
 /* ====== COUNTDOWN TIMER (限時上架倒數) ====== */
 .countdown-timer{
   display:inline-flex;align-items:center;gap:4px;

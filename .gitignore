@@ -42,3 +42,6 @@ wama-house-backend/
 
 # 其他在這個資料夾下的獨立 repo,不要被收編
 cve-report-analyzer/
+
+# 暫存 commit message file
+_commit_msg.txt

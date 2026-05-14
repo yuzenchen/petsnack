@@ -220,6 +220,18 @@
         body: JSON.stringify({ stock }),
       });
     },
+    adminSetProductVariants(productId, variants) {
+      return this._fetch('/admin/products/' + productId + '/variants', {
+        method: 'PUT',
+        body: JSON.stringify({ variants }),
+      });
+    },
+    adminSetVariantStock(productId, variantIndex, stock) {
+      return this._fetch(
+        '/admin/products/' + productId + '/variants/' + variantIndex + '/stock',
+        { method: 'PATCH', body: JSON.stringify({ stock }) }
+      );
+    },
     adminImportProducts(csv, dryRun) {
       return this._fetch('/admin/products/import', {
         method: 'POST',

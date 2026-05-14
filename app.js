@@ -804,25 +804,7 @@ function renderCategoryPage(type) {
   }
   const lbl = { new: '新品', hot: '熱賣', sale: '優惠' };
   grid.innerHTML = list.map(p => {
-    const tracked = p.trackStock !== false;
-    const isOut = tracked && (p.stock ?? 0) <= 0;
-    const badge = stockBadgeHtml(p.stock, p.lowStockThreshold ?? 5, p.trackStock);
-    return `
-    <article class="product-card${isOut ? ' is-out' : ''}" onclick="openProductModal('prod',${p.id})" style="cursor:pointer" tabindex="0" onkeydown="if(event.key==='Enter')openProductModal('prod',${p.id})">
-      ${p.badge ? `<span class="product-badge ${p.badge}">${lbl[p.badge]}</span>` : ''}
-      ${countdownBadgeHtml(p.endsAt)}
-      ${productMediaHtml(p)}
-      <div class="product-info">
-        <h5>${escHtml(p.name)}</h5>
-        <div class="product-sub">${escHtml(p.sub || '')}</div>
-        <div class="price-wrap">
-          <span class="price-sale">NT$ ${p.price}</span>
-          ${p.orig ? `<span class="price-regular">NT$ ${p.orig}</span>` : ''}
-        </div>
-        ${badge}
-      </div>
-      <button class="add-cart-btn" ${isOut ? 'disabled aria-disabled="true"' : ''} onclick="event.stopPropagation();addToCart('prod_${p.id}','${escAttrJs(p.emoji + ' ' + p.name)}','單品',${p.price},this)">${isOut ? '缺貨中' : '加入購物車'}</button>
-    </article>`;
+    return _renderProductCard(p, lbl);
   }).join('');
 }
 
@@ -846,6 +828,12 @@ function bundleScroll() {
 
 /* ============================ DATA RELOAD ============================ */
 function _normalizeProduct(p) {
+  const variants = Array.isArray(p.variants) ? p.variants.map((v) => ({
+    label: v.label,
+    price: v.price,
+    stock: v.stock ?? 0,
+    trackStock: v.trackStock !== false,
+  })) : [];
   return {
     id: p.productId, name: p.name, sub: p.sub, emoji: p.emoji,
     price: p.price, orig: p.orig, badge: p.badge, type: p.type,
@@ -854,7 +842,130 @@ function _normalizeProduct(p) {
     imageUrl: p.imageUrl || '', description: p.description || '',
     endsAt: p.endsAt || null,
     active: p.active !== false,
+    variants,                         // 多規格陣列
+    minPrice: p.minPrice ?? p.price,  // backend virtual,沒就 fallback
   };
+}
+
+/* helper: 商品是否有多規格 */
+function hasVariants(p) { return Array.isArray(p?.variants) && p.variants.length > 0; }
+
+/* helper: variant 有效庫存 (考慮 trackStock=false) */
+function variantStock(v) {
+  if (!v) return 0;
+  return v.trackStock === false ? Infinity : (v.stock ?? 0);
+}
+
+/* helper: 多規格商品的「最少 / 最多」價,顯示 NT$ X 起 */
+function priceRangeText(p) {
+  if (!hasVariants(p)) return 'NT$ ' + p.price;
+  const prices = p.variants.map((v) => v.price);
+  const min = Math.min(...prices);
+  const max = Math.max(...prices);
+  if (min === max) return 'NT$ ' + min;
+  return 'NT$ ' + min + ' 起';
+}
+
+/* product modal 中當下選的 variant index (null 表示單品/沒選) */
+let _selectedVariantIndex = null;
+
+/* 渲染規格選擇器 (按鈕群) */
+function _renderVariantSelector(p) {
+  if (!hasVariants(p)) return '';
+  return `
+    <div class="pmd-variant-selector">
+      <div class="pmd-variant-label">選擇規格</div>
+      <div class="pmd-variant-grid" id="pmd-variant-grid-${p.id}">
+        ${p.variants.map((v, i) => {
+          const out = variantStock(v) <= 0;
+          return `
+            <button class="pmd-variant-opt${out ? ' is-out' : ''}"
+                    data-vi="${i}"
+                    ${out ? 'disabled aria-disabled="true"' : ''}
+                    onclick="_pickVariant(${p.id}, ${i})">
+              <span class="pvo-label">${escHtml(v.label)}</span>
+              <span class="pvo-price">NT$ ${v.price}</span>
+              <span class="pvo-stock">${out ? '缺貨' : `庫存 ${v.trackStock === false ? '∞' : v.stock}`}</span>
+            </button>`;
+        }).join('')}
+      </div>
+    </div>`;
+}
+
+/* 點 variant 按鈕 — 更新選取狀態 + 動態更新價格 + 按鈕狀態 */
+function _pickVariant(productId, variantIndex) {
+  _selectedVariantIndex = variantIndex;
+  // 更新 button selected 狀態
+  document.querySelectorAll(`#pmd-variant-grid-${productId} .pmd-variant-opt`)
+    .forEach((b) => b.classList.toggle('selected', Number(b.dataset.vi) === variantIndex));
+  // 更新價格
+  const p = ALL_PRODUCTS.find(x => String(x.id) === String(productId));
+  const v = p?.variants?.[variantIndex];
+  const priceText = document.getElementById('pmd-price-text');
+  if (priceText && v) priceText.textContent = `NT$ ${v.price}`;
+  // 更新加入購物車按鈕狀態
+  const btn = document.getElementById('pmd-cart-btn');
+  if (btn && v) {
+    const out = variantStock(v) <= 0;
+    btn.disabled = out;
+    btn.textContent = out ? '⚠ 此規格缺貨' : '🛒 加入購物車';
+  }
+}
+
+/* 從 modal 把 variant 加進購物車 */
+function _addVariantToCart(productId) {
+  const p = ALL_PRODUCTS.find(x => String(x.id) === String(productId));
+  if (!p) return;
+  if (_selectedVariantIndex == null) { showToast('請選擇規格', false); return; }
+  const v = p.variants[_selectedVariantIndex];
+  if (!v) return;
+  if (variantStock(v) <= 0) { showToast('此規格缺貨', false); return; }
+  // 購物車 key: prod_5_v0 (區分不同 variant)
+  const key = `prod_${productId}_v${_selectedVariantIndex}`;
+  const name = `${p.emoji} ${p.name} (${v.label})`;
+  addToCart(key, name, '單品', v.price, document.getElementById('pmd-cart-btn'));
+  closeProductModal();
+}
+
+/* 共用 product card 渲染 (商店首頁 + 分類子頁 都用) */
+function _renderProductCard(p, lbl) {
+  const tracked = p.trackStock !== false;
+  const variantMode = hasVariants(p);
+  // variant 商品的庫存 = 所有 variant stock 加總 (UI 上判斷有沒有現貨)
+  const totalStock = variantMode
+    ? p.variants.reduce((s, v) => s + (v.trackStock === false ? Infinity : (v.stock || 0)), 0)
+    : (p.stock ?? 0);
+  const isOut = variantMode
+    ? totalStock <= 0
+    : tracked && totalStock <= 0;
+  const badge = variantMode
+    ? (totalStock <= 0 ? '<span class="stock-badge out">缺貨</span>' : '<span class="stock-badge ok">有現貨</span>')
+    : stockBadgeHtml(p.stock, p.lowStockThreshold ?? 5, p.trackStock);
+  const priceText = variantMode ? priceRangeText(p) : ('NT$ ' + p.price);
+  const variantBadge = variantMode
+    ? `<span class="variant-badge">${p.variants.length} 種規格</span>`
+    : '';
+  // variant 商品: 加購物車按鈕變「選擇規格 →」,點下去開 modal
+  const cartBtn = variantMode
+    ? `<button class="add-cart-btn" ${isOut ? 'disabled aria-disabled="true"' : ''} onclick="event.stopPropagation();openProductModal('prod',${p.id})">${isOut ? '缺貨中' : '選擇規格 →'}</button>`
+    : `<button class="add-cart-btn" ${isOut ? 'disabled aria-disabled="true"' : ''} onclick="event.stopPropagation();addToCart('prod_${p.id}','${escAttrJs(p.emoji + ' ' + p.name)}','單品',${p.price},this)">${isOut ? '缺貨中' : '加入購物車'}</button>`;
+  return `
+    <article class="product-card${isOut ? ' is-out' : ''}" onclick="openProductModal('prod',${p.id})" style="cursor:pointer" tabindex="0" onkeydown="if(event.key==='Enter')openProductModal('prod',${p.id})">
+      ${p.badge ? `<span class="product-badge ${p.badge}">${lbl[p.badge]}</span>` : ''}
+      ${countdownBadgeHtml(p.endsAt)}
+      ${variantBadge}
+      ${productMediaHtml(p)}
+      <div class="product-info">
+        <h5>${escHtml(p.name)}</h5>
+        <div class="product-sub">${escHtml(p.sub || '')}</div>
+        <div class="price-wrap">
+          <span class="price-sale">${escHtml(priceText)}</span>
+          ${p.orig && !variantMode ? `<span class="price-regular">NT$ ${p.orig}</span>` : ''}
+        </div>
+        ${badge}
+      </div>
+      ${cartBtn}
+    </article>`;
 }
 function _normalizeBundle(b)  { return { id: b.bundleId, name: b.name, tag: b.tag, items: b.items, disc: b.disc, visibility: b.visibility, active: b.active, imageUrl: b.imageUrl || '', description: b.description || '', endsAt: b.endsAt || null }; }
 function _normalizeAddon(a) {
@@ -1095,27 +1206,7 @@ function renderProducts() {
     grid.innerHTML = `<p style="grid-column:1/-1;text-align:center;color:var(--text-light);padding:40px">${msg}</p>`;
     return;
   }
-  grid.innerHTML = list.map(p => {
-    const tracked = p.trackStock !== false;
-    const isOut = tracked && (p.stock ?? 0) <= 0;
-    const badge = stockBadgeHtml(p.stock, p.lowStockThreshold ?? 5, p.trackStock);
-    return `
-    <article class="product-card${isOut ? ' is-out' : ''}" onclick="openProductModal('prod',${p.id})" style="cursor:pointer" tabindex="0" onkeydown="if(event.key==='Enter')openProductModal('prod',${p.id})">
-      ${p.badge ? `<span class="product-badge ${p.badge}">${lbl[p.badge]}</span>` : ''}
-      ${countdownBadgeHtml(p.endsAt)}
-      ${productMediaHtml(p)}
-      <div class="product-info">
-        <h5>${escHtml(p.name)}</h5>
-        <div class="product-sub">${escHtml(p.sub || '')}</div>
-        <div class="price-wrap">
-          <span class="price-sale">NT$ ${p.price}</span>
-          ${p.orig ? `<span class="price-regular">NT$ ${p.orig}</span>` : ''}
-        </div>
-        ${badge}
-      </div>
-      <button class="add-cart-btn" ${isOut ? 'disabled aria-disabled="true"' : ''} onclick="event.stopPropagation();addToCart('prod_${p.id}','${escAttrJs(p.emoji + ' ' + p.name)}','單品',${p.price},this)">${isOut ? '缺貨中' : '加入購物車'}</button>
-    </article>`;
-  }).join('');
+  grid.innerHTML = list.map(p => _renderProductCard(p, lbl)).join('');
 }
 
 /* ============================ BUNDLES ============================ */
@@ -1156,32 +1247,64 @@ function openProductModal(itemType, id) {
   if (itemType === 'prod') {
     const p = ALL_PRODUCTS.find(x => String(x.id) === String(id));
     if (!p) return;
+    const variantMode = hasVariants(p);
     const tracked = p.trackStock !== false;
-    const isOut = tracked && (p.stock ?? 0) <= 0;
-    const badge = stockBadgeHtml(p.stock, p.lowStockThreshold ?? 5, p.trackStock);
+    const totalStock = variantMode
+      ? p.variants.reduce((s, v) => s + (v.trackStock === false ? Infinity : (v.stock || 0)), 0)
+      : (p.stock ?? 0);
+    const isOut = variantMode ? totalStock <= 0 : tracked && totalStock <= 0;
+
+    const badge = variantMode
+      ? '' // 規格選擇器自己會顯示各規格庫存
+      : stockBadgeHtml(p.stock, p.lowStockThreshold ?? 5, p.trackStock);
+
     const imgContent = p.imageUrl
       ? `<div class="pmd-img-wrap" data-emoji="${escHtml(p.emoji)}" aria-hidden="true"><img src="${escHtml(p.imageUrl)}" alt="${escHtml(p.name)}" class="prod-real-img" onerror="this.parentNode.innerHTML=this.parentNode.dataset.emoji"></div>`
       : `<div class="pmd-img-wrap" aria-hidden="true"><div class="product-modal-emoji">${escHtml(p.emoji)}</div></div>`;
+
+    /* 多規格 — 渲染規格選擇器 + 動態價格 + 加購按鈕 */
+    const variantSelector = variantMode ? _renderVariantSelector(p) : '';
+    /* 預設選第一個有庫存的 variant */
+    if (variantMode) {
+      const firstInStock = p.variants.findIndex((v) => variantStock(v) > 0);
+      _selectedVariantIndex = firstInStock >= 0 ? firstInStock : 0;
+    } else {
+      _selectedVariantIndex = null;
+    }
+
+    const priceHtml = variantMode
+      ? `<div class="pmd-price-wrap" id="pmd-price-wrap-${p.id}">
+          <span class="price-sale" id="pmd-price-text">${escHtml(priceRangeText(p))}</span>
+        </div>`
+      : `<div class="pmd-price-wrap">
+          <span class="price-sale">NT$ ${p.price}</span>
+          ${p.orig ? `<span class="price-regular">NT$ ${p.orig}</span>` : ''}
+        </div>`;
+
+    const cartBtn = variantMode
+      ? `<button class="modal-btn primary pmd-cart-btn" id="pmd-cart-btn" onclick="_addVariantToCart(${p.id})">
+          🛒 加入購物車
+        </button>`
+      : `<button class="modal-btn primary pmd-cart-btn" ${isOut ? 'disabled' : ''} onclick="addToCart('prod_${p.id}','${escAttrJs(p.emoji + ' ' + p.name)}','單品',${p.price},this);closeProductModal()">
+          ${isOut ? '⚠ 缺貨中' : '🛒 加入購物車'}
+        </button>`;
+
     html = `
       <div class="pmd-layout">
         ${imgContent}
         <div class="pmd-info">
           <h3 id="product-modal-title">${escHtml(p.name)}</h3>
           ${p.sub ? `<p class="pmd-sub">${escHtml(p.sub)}</p>` : ''}
-          <div class="pmd-price-wrap">
-            <span class="price-sale">NT$ ${p.price}</span>
-            ${p.orig ? `<span class="price-regular">NT$ ${p.orig}</span>` : ''}
-          </div>
+          ${priceHtml}
           ${p.description ? `<p class="pmd-desc">${escHtml(p.description)}</p>` : ''}
           ${p.endsAt ? `<div class="pmd-countdown-wrap">${countdownBadgeHtml(p.endsAt, { size: 'lg' })}<span class="pmd-countdown-label">限時優惠倒數</span></div>` : ''}
+          ${variantSelector}
           <div class="pmd-tags">
             ${p.type ? `<span class="pmd-tag">${escHtml(PET_LABEL[p.type] || p.type)}</span>` : ''}
             ${p.badge ? `<span class="pmd-tag ${p.badge}">${escHtml(BADGE_LABEL[p.badge] || p.badge)}</span>` : ''}
           </div>
           ${badge}
-          <button class="modal-btn primary pmd-cart-btn" ${isOut ? 'disabled' : ''} onclick="addToCart('prod_${p.id}','${escAttrJs(p.emoji + ' ' + p.name)}','單品',${p.price},this);closeProductModal()">
-            ${isOut ? '⚠ 缺貨中' : '🛒 加入購物車'}
-          </button>
+          ${cartBtn}
         </div>
       </div>`;
 
@@ -1539,7 +1662,14 @@ function renderAddonAdmin() {
 /* ============================ CART ============================ */
 function parseCartKey(key) {
   const idx = key.indexOf('_');
-  return { refType: key.slice(0, idx), refId: key.slice(idx + 1) };
+  const refType = key.slice(0, idx);
+  const rest = key.slice(idx + 1);
+  // 多規格商品: prod_5_v0 → refId=5, variantIndex=0
+  const vMatch = rest.match(/^(\d+)_v(\d+)$/);
+  if (vMatch && refType === 'prod') {
+    return { refType, refId: vMatch[1], variantIndex: Number(vMatch[2]) };
+  }
+  return { refType, refId: rest };
 }
 
 function addToCart(key, name, type, price, btnEl) {
@@ -1671,8 +1801,10 @@ function collectCartItems() {
   return Object.entries(cart)
     .filter(([_, v]) => v.qty > 0)
     .map(([key, v]) => {
-      const { refType, refId } = parseCartKey(key);
-      return { refType, refId, qty: v.qty };
+      const parsed = parseCartKey(key);
+      const item = { refType: parsed.refType, refId: parsed.refId, qty: v.qty };
+      if (parsed.variantIndex !== undefined) item.variantIndex = parsed.variantIndex;
+      return item;
     });
 }
 
@@ -3030,24 +3162,48 @@ function renderStockList() {
             </div>
           </div>
         </div>` : '';
+
+    /* 多規格商品 — 規格管理面板 + 主庫存輸入框 disabled (改在 panel 內逐項編輯) */
+    const variantPanel = (type === 'product' && hasVariants(item)) ? `
+        <div class="variant-edit-panel" id="variants-${item.id}" style="display:none;grid-column:1/-1;padding:10px 14px;background:#FFF5EE;border-top:1px dashed var(--border)">
+          ${_renderAdminVariantsEditor(item)}
+        </div>` : '';
+    const variantToggle = (type === 'product')
+      ? `<button class="pill-btn" style="background:#5C7E8F;color:#fff" onclick="toggleVariantsPanel(${item.id})" title="管理規格 (multi-size)">📏 規格</button>`
+      : '';
+
     const metaToggle = type === 'product'
       ? `<button class="pill-btn gray" onclick="toggleProductMeta(${item.id})" title="編輯圖片/描述">✎</button>
+         ${variantToggle}
          <button class="pill-btn" style="background:var(--red-light);color:var(--red)" onclick="adminDeleteProduct(${item.id}, '${escAttrJs(item.name)}')" title="刪除商品">🗑</button>`
       : '';
+
+    // 多規格商品: 主 stock input 顯示「規格庫存 N」並 disable,改用 panel 編輯
+    const isVariantProduct = type === 'product' && hasVariants(item);
+    const totalVariantStock = isVariantProduct
+      ? item.variants.reduce((s, v) => s + (v.stock || 0), 0)
+      : 0;
+    const stockInputHtml = isVariantProduct
+      ? `<div style="font-size:12px;color:var(--text-light);padding:6px 10px;background:var(--bg);border-radius:4px;white-space:nowrap">
+           ${item.variants.length} 規格 · ∑庫存 ${totalVariantStock}
+         </div>`
+      : `<input type="number" min="0" max="99999" class="stock-input" value="${stock}" ${idAttr} aria-label="庫存數量"
+                 onkeypress="if(event.key==='Enter')saveStockChange(this)">
+         <button class="pill-btn green" onclick="saveStockChange(this.previousElementSibling)" title="儲存">儲存</button>`;
+
     return `
       <div class="bundle-list-item stock-row ${status === 'ok' ? '' : 'stock-warn'}" style="display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:10px;">
         <div class="bli-emojis" aria-hidden="true">${escHtml(item.emoji)}</div>
         <div class="bli-info">
-          <div class="bli-name">${escHtml(item.name)} ${badge}</div>
+          <div class="bli-name">${escHtml(item.name)} ${badge}${isVariantProduct ? ' <span class="variant-badge" style="position:static;display:inline-block;vertical-align:middle">' + item.variants.length + ' 種規格</span>' : ''}</div>
           <div class="bli-sub">${type === 'addon' ? '🎁 加價購' : '單品'} · 警示線:${threshold}</div>
         </div>
-        <div class="stock-edit" style="display:flex;gap:6px;align-items:center;">
-          <input type="number" min="0" max="99999" class="stock-input" value="${stock}" ${idAttr} aria-label="庫存數量"
-                 onkeypress="if(event.key==='Enter')saveStockChange(this)">
-          <button class="pill-btn green" onclick="saveStockChange(this.previousElementSibling)" title="儲存">儲存</button>
+        <div class="stock-edit" style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+          ${stockInputHtml}
           ${metaToggle}
         </div>
         ${metaPanel}
+        ${variantPanel}
       </div>`;
   };
 
@@ -3061,6 +3217,79 @@ function toggleProductMeta(productId) {
   const panel = document.getElementById('meta-' + productId);
   if (!panel) return;
   panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+}
+
+/* ===== Admin: 多規格管理面板 ===== */
+function toggleVariantsPanel(productId) {
+  const panel = document.getElementById('variants-' + productId);
+  if (!panel) return;
+  // 如果還沒有 variant,初始化空容器(需要 product 在 cache 裡)
+  if (!hasVariants(_adminStockCache?.products?.find(p => p.id === productId)) && panel.innerHTML.trim().length < 50) {
+    const item = _adminStockCache?.products?.find(p => p.id === productId);
+    if (item) panel.innerHTML = _renderAdminVariantsEditor(item);
+  }
+  panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+}
+
+function _renderAdminVariantsEditor(product) {
+  const rows = (product.variants || []).map((v, i) => `
+    <div class="variant-row" data-vi="${i}">
+      <input class="ve-label" placeholder="規格 (例 L 50g±5)" value="${escHtml(v.label)}" maxlength="50">
+      <input type="number" class="ve-price" placeholder="價格" value="${v.price}" min="0">
+      <input type="number" class="ve-stock" placeholder="庫存" value="${v.stock}" min="0">
+      <button class="pill-btn gray" onclick="this.parentNode.remove()" title="刪除這個規格">✕</button>
+    </div>
+  `).join('');
+  return `
+    <div style="font-size:12px;color:var(--text-light);margin-bottom:8px">
+      💡 提示:多規格商品的「主庫存」會被忽略,實際庫存以下方各規格為準。
+      想轉回單品就把所有規格刪掉再儲存。
+    </div>
+    <div id="variants-rows-${product.id}" class="variant-edit-rows">
+      ${rows}
+    </div>
+    <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
+      <button class="pill-btn gray" onclick="_addVariantRow(${product.id})">＋ 新增規格</button>
+      <button class="pill-btn green" onclick="saveProductVariants(${product.id})">💾 儲存所有規格</button>
+    </div>
+  `;
+}
+
+function _addVariantRow(productId) {
+  const rows = document.getElementById('variants-rows-' + productId);
+  if (!rows) return;
+  const div = document.createElement('div');
+  div.className = 'variant-row';
+  div.innerHTML = `
+    <input class="ve-label" placeholder="規格 (例 L 50g±5)" maxlength="50">
+    <input type="number" class="ve-price" placeholder="價格" min="0">
+    <input type="number" class="ve-stock" placeholder="庫存" min="0" value="0">
+    <button class="pill-btn gray" onclick="this.parentNode.remove()" title="刪除這個規格">✕</button>
+  `;
+  rows.appendChild(div);
+}
+
+async function saveProductVariants(productId) {
+  const rows = document.querySelectorAll(`#variants-rows-${productId} .variant-row`);
+  const variants = [];
+  for (const r of rows) {
+    const label = r.querySelector('.ve-label')?.value.trim() || '';
+    const price = parseInt(r.querySelector('.ve-price')?.value, 10);
+    const stock = parseInt(r.querySelector('.ve-stock')?.value, 10) || 0;
+    if (!label) { showToast('規格名稱不可為空', false); return; }
+    if (Number.isNaN(price) || price < 0) { showToast(`規格「${label}」價格不正確`, false); return; }
+    variants.push({ label, price, stock, trackStock: true });
+  }
+  try {
+    await Api.adminSetProductVariants(productId, variants);
+    showToast(variants.length === 0
+      ? '✓ 已取消多規格 (轉回單品)'
+      : `✓ 已儲存 ${variants.length} 種規格`, true);
+    await loadStockList();
+    reloadCatalog();
+  } catch (e) {
+    showToast('儲存失敗:' + (e.message || ''), false);
+  }
 }
 
 async function saveProductMeta(productId) {
