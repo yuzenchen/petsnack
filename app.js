@@ -1258,7 +1258,7 @@ function renderProducts() {
 
 /* ============================ BUNDLES ============================ */
 function getProduct(id) { return ALL_PRODUCTS.find(p => p.id === id); }
-function bundleOrig(b) { return b.items.reduce((s, id) => s + (getProduct(id)?.price || 0), 0); }
+function bundleOrig(b) { return b.items.reduce((s, id) => s + _bundlePriceOf(getProduct(id)), 0); }
 function bundleFinal(b) { return Math.round(bundleOrig(b) * (1 - b.disc / 100)); }
 
 function renderBundleShop() {
@@ -1468,16 +1468,31 @@ function setVisibility(el, vis) {
   currentVisibility = vis;
 }
 
+/* 多規格商品在組合包中採「最低價」計算 (顯示為 NT$X 起) */
+function _bundlePriceOf(p) {
+  if (!p) return 0;
+  if (hasVariants(p)) {
+    const prices = p.variants.map((v) => Number(v.price) || 0).filter((n) => n > 0);
+    return prices.length ? Math.min(...prices) : (p.price || 0);
+  }
+  return p.price || 0;
+}
+
 function renderChipSelector() {
   const el = document.getElementById('prod-selector');
   if (!el) return;
-  el.innerHTML = ALL_PRODUCTS.map(p => `
+  el.innerHTML = ALL_PRODUCTS.map(p => {
+    const isVar = hasVariants(p);
+    const priceLabel = isVar ? `${priceRangeText(p)}` : `NT$${p.price}`;
+    const varTag = isVar ? ` <span class="sel-chip-variant" title="多規格 — 以最低價計入組合">${p.variants.length}規格</span>` : '';
+    return `
     <div class="sel-chip ${selectedChips.includes(p.id) ? 'selected' : ''}"
          onclick="toggleChip(this,${p.id})"
          onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggleChip(this,${p.id})}"
          role="button" tabindex="0" aria-pressed="${selectedChips.includes(p.id)}">
-      <span aria-hidden="true">${p.emoji}</span>${p.name} NT$${p.price}
-    </div>`).join('');
+      <span aria-hidden="true">${p.emoji}</span>${escHtml(p.name)} ${priceLabel}${varTag}
+    </div>`;
+  }).join('');
 }
 
 function toggleChip(el, id) {
@@ -1500,18 +1515,20 @@ function updatePreview() {
   const box = document.getElementById('preview-box');
   if (selectedChips.length < 2) { box.innerHTML = '<span class="preview-hint">請選擇至少 2 件商品後預覽</span>'; return; }
   const items = selectedChips.map(getProduct).filter(Boolean);
-  const orig = items.reduce((s, p) => s + p.price, 0);
+  const orig = items.reduce((s, p) => s + _bundlePriceOf(p), 0);
   const final = Math.round(orig * (1 - disc / 100));
   const save = orig - final;
+  const hasVar = items.some(hasVariants);
   box.innerHTML = `
     <div>
       <div class="preview-emojis">${items.map(p => p.emoji).join(' ')}</div>
       <div class="preview-names">${items.map(p => p.name).join('、')}</div>
     </div>
     <div class="preview-right">
-      <div class="preview-orig">原價 NT$${orig}</div>
-      <div class="preview-final">NT$${final}</div>
+      <div class="preview-orig">原價 NT$${orig}${hasVar ? ' 起' : ''}</div>
+      <div class="preview-final">NT$${final}${hasVar ? ' 起' : ''}</div>
       <span class="preview-save">省 NT$${save}（${disc}% OFF）</span>
+      ${hasVar ? '<div class="preview-hint" style="margin-top:6px;font-size:11px">含多規格商品 — 以最低規格價估算</div>' : ''}
     </div>`;
 }
 
