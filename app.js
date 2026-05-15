@@ -1389,16 +1389,35 @@ function openProductModal(itemType, id) {
     const avail = bundleAvailableStock(b);
     const isOut = avail <= 0;
     const badge = stockBadgeHtml(avail, 5);
-    /* 沒設封面時改用單品縮圖 collage (跟卡片視覺一致) */
-    const modalCollageHtml = items.map((p) => {
-      if (p.imageUrl) {
-        return `<div class="bundle-collage-cell"><img src="${escHtml(p.imageUrl)}" alt="${escHtml(p.name)}" onerror="this.parentNode.innerHTML='<span class=&quot;bundle-collage-emoji&quot;>${escHtml(p.emoji || '📦')}</span>'"></div>`;
-      }
-      return `<div class="bundle-collage-cell"><span class="bundle-collage-emoji">${escHtml(p.emoji || '📦')}</span></div>`;
+    /* 沒設封面時改用 gallery: 主預覽 + 縮圖列;hover/點縮圖切換主圖 */
+    const firstItem = items[0];
+    const mainInitial = firstItem?.imageUrl
+      ? `<img src="${escHtml(firstItem.imageUrl)}" alt="${escHtml(firstItem.name)}" onerror="this.parentNode.innerHTML='<span class=&quot;bundle-gallery-main-emoji&quot;>${escHtml(firstItem.emoji || '📦')}</span>'">`
+      : `<span class="bundle-gallery-main-emoji">${escHtml(firstItem?.emoji || '📦')}</span>`;
+    const thumbsHtml = items.map((p, i) => {
+      const thumbInner = p.imageUrl
+        ? `<img src="${escHtml(p.imageUrl)}" alt="${escHtml(p.name)}" onerror="this.parentNode.innerHTML='<span class=&quot;bundle-gallery-thumb-emoji&quot;>${escHtml(p.emoji || '📦')}</span>'">`
+        : `<span class="bundle-gallery-thumb-emoji">${escHtml(p.emoji || '📦')}</span>`;
+      return `<button type="button" class="bundle-gallery-thumb ${i === 0 ? 'active' : ''}"
+        data-src="${escHtml(p.imageUrl || '')}"
+        data-emoji="${escHtml(p.emoji || '📦')}"
+        data-name="${escHtml(p.name)}"
+        title="${escHtml(p.name)}"
+        onmouseenter="_setBundleGalleryThumb(this)"
+        onclick="_setBundleGalleryThumb(this)"
+        onfocus="_setBundleGalleryThumb(this)"
+        aria-label="預覽 ${escHtml(p.name)}">${thumbInner}</button>`;
     }).join('');
+    const galleryHtml = `
+      <div class="pmd-img-wrap bundle-gallery-wrap" aria-hidden="true">
+        <div class="bundle-gallery">
+          <div class="bundle-gallery-main">${mainInitial}</div>
+          <div class="bundle-gallery-strip">${thumbsHtml}</div>
+        </div>
+      </div>`;
     const imgContent = b.imageUrl
       ? `<div class="pmd-img-wrap" data-emoji="${escHtml(emojis)}" aria-hidden="true"><img src="${escHtml(b.imageUrl)}" alt="${escHtml(b.name)}" class="prod-real-img" onerror="this.parentNode.innerHTML=this.parentNode.dataset.emoji"></div>`
-      : `<div class="pmd-img-wrap" aria-hidden="true"><div class="bundle-collage bundle-collage-${items.length}">${modalCollageHtml}</div></div>`;
+      : galleryHtml;
     html = `
       <div class="pmd-layout">
         ${imgContent}
@@ -1435,6 +1454,25 @@ function openProductModal(itemType, id) {
   modal.classList.add('active');
   modal.setAttribute('aria-hidden', 'false');
   setTimeout(() => modal.querySelector('.modal-close')?.focus(), 100);
+}
+
+/* bundle modal gallery: hover/click 縮圖 → 切換主預覽 */
+function _setBundleGalleryThumb(btn) {
+  if (!btn) return;
+  const gallery = btn.closest('.bundle-gallery');
+  if (!gallery) return;
+  gallery.querySelectorAll('.bundle-gallery-thumb').forEach((t) => t.classList.remove('active'));
+  btn.classList.add('active');
+  const main = gallery.querySelector('.bundle-gallery-main');
+  if (!main) return;
+  const src = btn.getAttribute('data-src');
+  const emoji = btn.getAttribute('data-emoji') || '📦';
+  const name = btn.getAttribute('data-name') || '';
+  if (src) {
+    main.innerHTML = `<img src="${escHtml(src)}" alt="${escHtml(name)}" onerror="this.parentNode.innerHTML='<span class=&quot;bundle-gallery-main-emoji&quot;>${escHtml(emoji)}</span>'">`;
+  } else {
+    main.innerHTML = `<span class="bundle-gallery-main-emoji">${escHtml(emoji)}</span>`;
+  }
 }
 
 function closeProductModal() {
