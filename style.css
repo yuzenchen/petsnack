@@ -1376,7 +1376,12 @@ body.role-admin .bnav-btn.admin-only{display:flex}
    PRODUCT DETAIL MODAL
    ============================ */
 .product-detail-modal{
-  max-width:560px;padding:0;overflow:hidden;
+  max-width:560px;padding:0;
+  /* 手機版內容常超過視窗,要能垂直捲動;水平 hidden 保留圖片圓角裁切 */
+  overflow-x:hidden;overflow-y:auto;
+  max-height:calc(100vh - 40px);
+  -webkit-overflow-scrolling:touch;
+  overscroll-behavior:contain;
   backdrop-filter:none; /* container handles blur */
 }
 /* backdrop blur 套在 overlay */
