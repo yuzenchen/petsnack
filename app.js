@@ -1389,9 +1389,16 @@ function openProductModal(itemType, id) {
     const avail = bundleAvailableStock(b);
     const isOut = avail <= 0;
     const badge = stockBadgeHtml(avail, 5);
+    /* 沒設封面時改用單品縮圖 collage (跟卡片視覺一致) */
+    const modalCollageHtml = items.map((p) => {
+      if (p.imageUrl) {
+        return `<div class="bundle-collage-cell"><img src="${escHtml(p.imageUrl)}" alt="${escHtml(p.name)}" onerror="this.parentNode.innerHTML='<span class=&quot;bundle-collage-emoji&quot;>${escHtml(p.emoji || '📦')}</span>'"></div>`;
+      }
+      return `<div class="bundle-collage-cell"><span class="bundle-collage-emoji">${escHtml(p.emoji || '📦')}</span></div>`;
+    }).join('');
     const imgContent = b.imageUrl
       ? `<div class="pmd-img-wrap" data-emoji="${escHtml(emojis)}" aria-hidden="true"><img src="${escHtml(b.imageUrl)}" alt="${escHtml(b.name)}" class="prod-real-img" onerror="this.parentNode.innerHTML=this.parentNode.dataset.emoji"></div>`
-      : `<div class="pmd-img-wrap" aria-hidden="true"><div class="product-modal-emoji bundle-modal-emoji">${escHtml(emojis)}</div></div>`;
+      : `<div class="pmd-img-wrap" aria-hidden="true"><div class="bundle-collage bundle-collage-${items.length}">${modalCollageHtml}</div></div>`;
     html = `
       <div class="pmd-layout">
         ${imgContent}
@@ -1450,9 +1457,18 @@ function renderBundleCard(b, isDealer) {
   const avail = bundleAvailableStock(b);
   const isOut = avail <= 0;
   const badge = stockBadgeHtml(avail, 5);
+  /* 沒設定 b.imageUrl 時,自動把單品縮圖拼成組合 collage:
+     - 有 imageUrl 的單品:用真實圖
+     - 沒圖的單品:fallback 顯示該商品 emoji */
+  const collageHtml = items.map((p) => {
+    if (p.imageUrl) {
+      return `<div class="bundle-collage-cell"><img src="${escHtml(p.imageUrl)}" alt="${escHtml(p.name)}" onerror="this.parentNode.innerHTML='<span class=&quot;bundle-collage-emoji&quot;>${escHtml(p.emoji || '📦')}</span>'"></div>`;
+    }
+    return `<div class="bundle-collage-cell"><span class="bundle-collage-emoji">${escHtml(p.emoji || '📦')}</span></div>`;
+  }).join('');
   const bundleImgHtml = b.imageUrl
     ? `<div class="product-img" data-emoji="${escHtml(emojis)}" aria-hidden="true"><img src="${escHtml(b.imageUrl)}" alt="${escHtml(b.name)}" class="prod-real-img" onerror="this.parentNode.innerHTML=this.parentNode.dataset.emoji"></div>`
-    : `<div class="product-img" aria-hidden="true"><span class="bundle-emojis-row">${escHtml(emojis)}</span></div>`;
+    : `<div class="product-img bundle-collage bundle-collage-${items.length}" aria-hidden="true">${collageHtml}</div>`;
   return `
     <article class="product-card bundle-card ${isDealer ? 'dealer' : ''}${isOut ? ' is-out' : ''}" onclick="openProductModal('bundle',${b.id})" style="cursor:pointer" tabindex="0" onkeydown="if(event.key==='Enter')openProductModal('bundle',${b.id})">
       ${isDealer ? '<span class="bundle-vip-tag">VIP</span>' : ''}
