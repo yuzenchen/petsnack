@@ -1487,7 +1487,7 @@ body.role-admin .bnav-btn.admin-only{display:flex}
   flex-shrink:0;overflow:hidden;
 }
 @media(min-width:500px){
-  .pmd-img-wrap{width:220px;aspect-ratio:auto;align-self:stretch}
+  .pmd-img-wrap{width:240px;aspect-ratio:1;align-self:flex-start}
 }
 .product-modal-emoji{font-size:80px;line-height:1;text-align:center}
 .bundle-modal-emoji{
