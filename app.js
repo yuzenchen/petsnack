@@ -552,7 +552,7 @@ function matchesBundleSearchQuery(bundle, query) {
   if (!query) return true;
   const lowerQuery = query.toLowerCase();
   const bundleName = bundle.name || '';
-  const bundleTag = bundle.tag || '';
+  const bundleTag = bundleTagLabel(bundle);
   if (bundleName.toLowerCase().includes(lowerQuery) || bundleTag.toLowerCase().includes(lowerQuery)) return true;
   const items = bundle.items?.map(getProduct).filter(Boolean) || [];
   return items.some(p => matchesSearchQuery(p, query));
@@ -634,7 +634,7 @@ function renderMobileSearchResults(query) {
       <div class="search-result-emoji">${escHtml(emojis || '📦')}</div>
       <div class="search-result-info">
         <div class="search-result-name">${escHtml(b.name)} <span class="search-result-tag">組合包</span></div>
-        ${b.tag ? `<div class="search-result-sub">${escHtml(b.tag)}</div>` : ''}
+        ${b.tag ? `<div class="search-result-sub">${escHtml(bundleTagLabel(b))}</div>` : ''}
       </div>
       <div class="search-result-price">NT$ ${final}</div>
     </button>`;
@@ -844,15 +844,18 @@ function renderCategoryPage(type) {
   }
 
   const grid = document.getElementById('cat-products-grid');
-  const list = ALL_PRODUCTS.filter(p => p.type === type);
-  if (!list.length) {
+  const products = ALL_PRODUCTS.filter(p => p.type === type);
+  /* 同類組合包:tag 等於該分類 key,且 visibility=public (經銷限定不顯示在公開分類頁) */
+  const bundles = (typeof BUNDLES !== 'undefined' ? BUNDLES : [])
+    .filter(b => b && b.active && b.tag === type && b.visibility !== 'dealer');
+  if (!products.length && !bundles.length) {
     grid.innerHTML = '<p style="grid-column:1/-1;text-align:center;color:var(--text-light);padding:40px">此分類目前無商品</p>';
     return;
   }
   const lbl = { new: '新品', hot: '熱賣', sale: '優惠' };
-  grid.innerHTML = list.map(p => {
-    return _renderProductCard(p, lbl);
-  }).join('');
+  const productsHtml = products.map(p => _renderProductCard(p, lbl)).join('');
+  const bundlesHtml = bundles.map(b => renderBundleCard(b, false)).join('');
+  grid.innerHTML = productsHtml + bundlesHtml;
 }
 
 function applyHashRoute() {
@@ -1015,6 +1018,15 @@ function _renderProductCard(p, lbl) {
     </article>`;
 }
 function _normalizeBundle(b)  { return { id: b.bundleId, name: b.name, tag: b.tag, items: b.items, itemSpecs: b.itemSpecs || null, disc: b.disc, visibility: b.visibility, active: b.active, imageUrl: b.imageUrl || '', description: b.description || '', endsAt: b.endsAt || null }; }
+
+/* tag 可能是新格式 (easy/mild/medium/hard) 或 legacy 自由字串 ('🐶 狗狗專屬').
+   新格式用 CATEGORY_META 轉成「emoji 標題」;legacy 直接顯示原字串. */
+function bundleTagLabel(b) {
+  if (!b || !b.tag) return '';
+  const meta = CATEGORY_META && CATEGORY_META[b.tag];
+  if (meta) return `${meta.emoji} ${meta.title}`;
+  return b.tag;
+}
 function _normalizeAddon(a) {
   return {
     id: a.addonId, name: a.name, emoji: a.emoji,
@@ -1385,7 +1397,7 @@ function openProductModal(itemType, id) {
         ${imgContent}
         <div class="pmd-info">
           <h3 id="product-modal-title">${escHtml(b.name)}</h3>
-          ${b.tag ? `<p class="pmd-sub">${escHtml(b.tag)}</p>` : ''}
+          ${b.tag ? `<p class="pmd-sub">${escHtml(bundleTagLabel(b))}</p>` : ''}
           <div class="pmd-price-wrap">
             <span class="bundle-ribbon-inline">${b.disc}% OFF</span>
             <span class="price-sale">NT$ ${final}</span>
@@ -1449,7 +1461,7 @@ function renderBundleCard(b, isDealer) {
       ${bundleImgHtml}
       <div class="product-info">
         <h5>${escHtml(b.name)}</h5>
-        <div class="product-sub">${escHtml(b.tag || '')}</div>
+        <div class="product-sub">${escHtml(bundleTagLabel(b))}</div>
         <div class="bundle-items-list">${escHtml(names)}</div>
         <div class="price-wrap">
           <span class="price-sale">NT$ ${final}</span>
@@ -1665,7 +1677,7 @@ function renderBundleAdmin() {
         <div class="status-dot ${b.active ? 'dot-on' : 'dot-off'}" title="${b.active ? '上架中' : '已下架'}"></div>
         <div class="bli-emojis" aria-hidden="true">${items.map(p => p.emoji).join('')}</div>
         <div class="bli-info">
-          <div class="bli-name">${b.name} ${visBadge} <span class="bli-tag">${b.tag || ''}</span></div>
+          <div class="bli-name">${escHtml(b.name)} ${visBadge} <span class="bli-tag">${escHtml(bundleTagLabel(b))}</span></div>
           <div class="bli-sub">${items.map(p => p.name).join('、')}</div>
           ${endsAtInfo}
         </div>
