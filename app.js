@@ -1014,7 +1014,7 @@ function _renderProductCard(p, lbl) {
       ${cartBtn}
     </article>`;
 }
-function _normalizeBundle(b)  { return { id: b.bundleId, name: b.name, tag: b.tag, items: b.items, disc: b.disc, visibility: b.visibility, active: b.active, imageUrl: b.imageUrl || '', description: b.description || '', endsAt: b.endsAt || null }; }
+function _normalizeBundle(b)  { return { id: b.bundleId, name: b.name, tag: b.tag, items: b.items, itemSpecs: b.itemSpecs || null, disc: b.disc, visibility: b.visibility, active: b.active, imageUrl: b.imageUrl || '', description: b.description || '', endsAt: b.endsAt || null }; }
 function _normalizeAddon(a) {
   return {
     id: a.addonId, name: a.name, emoji: a.emoji,
@@ -1258,7 +1258,12 @@ function renderProducts() {
 
 /* ============================ BUNDLES ============================ */
 function getProduct(id) { return ALL_PRODUCTS.find(p => p.id === id); }
-function bundleOrig(b) { return b.items.reduce((s, id) => s + _bundlePriceOf(getProduct(id)), 0); }
+function bundleOrig(b) {
+  if (Array.isArray(b.itemSpecs) && b.itemSpecs.length) {
+    return b.itemSpecs.reduce((s, sp) => s + _specPriceOf(sp), 0);
+  }
+  return b.items.reduce((s, id) => s + _bundlePriceOf(getProduct(id)), 0);
+}
 function bundleFinal(b) { return Math.round(bundleOrig(b) * (1 - b.disc / 100)); }
 
 function renderBundleShop() {
@@ -1468,7 +1473,29 @@ function setVisibility(el, vis) {
   currentVisibility = vis;
 }
 
-/* 多規格商品在組合包中採「最低價」計算 (顯示為 NT$X 起) */
+/* selectedChips 改為存 spec 物件:{ productId, variantIndex } (variantIndex null=無多規格) */
+
+function _specKey(productId, variantIndex) {
+  return variantIndex == null ? `p${productId}` : `p${productId}v${variantIndex}`;
+}
+
+function _isSelected(productId, variantIndex) {
+  return selectedChips.some((s) =>
+    s.productId === productId && (s.variantIndex ?? null) === (variantIndex ?? null)
+  );
+}
+
+/* 取得 spec 對應的價格;variantIndex 有設定就用該規格價,否則用 p.price */
+function _specPriceOf(spec) {
+  const p = getProduct(spec.productId);
+  if (!p) return 0;
+  if (spec.variantIndex != null && Array.isArray(p.variants) && p.variants[spec.variantIndex]) {
+    return Number(p.variants[spec.variantIndex].price) || 0;
+  }
+  return Number(p.price) || 0;
+}
+
+/* legacy:供 bundleOrig (前台展示既有 bundle.items) 使用 — 沒 variant 資訊時取最低 */
 function _bundlePriceOf(p) {
   if (!p) return 0;
   if (hasVariants(p)) {
@@ -1481,28 +1508,52 @@ function _bundlePriceOf(p) {
 function renderChipSelector() {
   const el = document.getElementById('prod-selector');
   if (!el) return;
-  el.innerHTML = ALL_PRODUCTS.map(p => {
-    const isVar = hasVariants(p);
-    const priceLabel = isVar ? `${priceRangeText(p)}` : `NT$${p.price}`;
-    const varTag = isVar ? ` <span class="sel-chip-variant" title="多規格 — 以最低價計入組合">${p.variants.length}規格</span>` : '';
-    return `
-    <div class="sel-chip ${selectedChips.includes(p.id) ? 'selected' : ''}"
-         onclick="toggleChip(this,${p.id})"
-         onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggleChip(this,${p.id})}"
-         role="button" tabindex="0" aria-pressed="${selectedChips.includes(p.id)}">
-      <span aria-hidden="true">${p.emoji}</span>${escHtml(p.name)} ${priceLabel}${varTag}
-    </div>`;
-  }).join('');
+  /* 每個多規格商品展開成 N 個 chip,每個 chip 代表一個 (productId,variantIndex) */
+  const chips = [];
+  ALL_PRODUCTS.forEach((p) => {
+    if (hasVariants(p)) {
+      p.variants.forEach((v, idx) => {
+        const sel = _isSelected(p.id, idx);
+        chips.push(`
+          <div class="sel-chip sel-chip-var ${sel ? 'selected' : ''}"
+               onclick="toggleChip(this,${p.id},${idx})"
+               onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggleChip(this,${p.id},${idx})}"
+               role="button" tabindex="0" aria-pressed="${sel}"
+               title="${escHtml(p.name)} — ${escHtml(v.label || '規格 ' + (idx+1))}">
+            <span aria-hidden="true">${p.emoji}</span>
+            ${escHtml(p.name)}
+            <span class="sel-chip-vlabel">${escHtml(v.label || '規格' + (idx+1))}</span>
+            NT$${Number(v.price) || 0}
+          </div>`);
+      });
+    } else {
+      const sel = _isSelected(p.id, null);
+      chips.push(`
+        <div class="sel-chip ${sel ? 'selected' : ''}"
+             onclick="toggleChip(this,${p.id},null)"
+             onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggleChip(this,${p.id},null)}"
+             role="button" tabindex="0" aria-pressed="${sel}">
+          <span aria-hidden="true">${p.emoji}</span>${escHtml(p.name)} NT$${p.price}
+        </div>`);
+    }
+  });
+  el.innerHTML = chips.join('');
 }
 
-function toggleChip(el, id) {
-  if (el.classList.contains('selected')) {
+function toggleChip(el, productId, variantIndex) {
+  const vi = variantIndex == null ? null : Number(variantIndex);
+  const idx = selectedChips.findIndex((s) =>
+    s.productId === productId && (s.variantIndex ?? null) === (vi ?? null)
+  );
+  if (idx >= 0) {
+    selectedChips.splice(idx, 1);
     el.classList.remove('selected');
-    selectedChips = selectedChips.filter(x => x !== id);
+    el.setAttribute('aria-pressed', 'false');
   } else {
     if (selectedChips.length >= 4) { showToast('最多選擇 4 件商品！', false); return; }
+    selectedChips.push({ productId, variantIndex: vi });
     el.classList.add('selected');
-    selectedChips.push(id);
+    el.setAttribute('aria-pressed', 'true');
   }
   updatePreview();
 }
@@ -1514,21 +1565,28 @@ function updatePreview() {
   document.getElementById('disc-val').textContent = `${disc}% OFF`;
   const box = document.getElementById('preview-box');
   if (selectedChips.length < 2) { box.innerHTML = '<span class="preview-hint">請選擇至少 2 件商品後預覽</span>'; return; }
-  const items = selectedChips.map(getProduct).filter(Boolean);
-  const orig = items.reduce((s, p) => s + _bundlePriceOf(p), 0);
+  const specs = selectedChips.filter((s) => getProduct(s.productId));
+  const orig = specs.reduce((s, sp) => s + _specPriceOf(sp), 0);
   const final = Math.round(orig * (1 - disc / 100));
   const save = orig - final;
-  const hasVar = items.some(hasVariants);
+  const labels = specs.map((sp) => {
+    const p = getProduct(sp.productId);
+    if (!p) return '';
+    if (sp.variantIndex != null && p.variants && p.variants[sp.variantIndex]) {
+      return `${p.name}（${p.variants[sp.variantIndex].label || '規格' + (sp.variantIndex + 1)}）`;
+    }
+    return p.name;
+  });
+  const emojis = specs.map((sp) => getProduct(sp.productId)?.emoji || '').join(' ');
   box.innerHTML = `
     <div>
-      <div class="preview-emojis">${items.map(p => p.emoji).join(' ')}</div>
-      <div class="preview-names">${items.map(p => p.name).join('、')}</div>
+      <div class="preview-emojis">${emojis}</div>
+      <div class="preview-names">${labels.map(escHtml).join('、')}</div>
     </div>
     <div class="preview-right">
-      <div class="preview-orig">原價 NT$${orig}${hasVar ? ' 起' : ''}</div>
-      <div class="preview-final">NT$${final}${hasVar ? ' 起' : ''}</div>
+      <div class="preview-orig">原價 NT$${orig}</div>
+      <div class="preview-final">NT$${final}</div>
       <span class="preview-save">省 NT$${save}（${disc}% OFF）</span>
-      ${hasVar ? '<div class="preview-hint" style="margin-top:6px;font-size:11px">含多規格商品 — 以最低規格價估算</div>' : ''}
     </div>`;
 }
 
@@ -1559,7 +1617,12 @@ async function saveBundle() {
   const endsAtRaw = document.getElementById('b-endsAt')?.value || '';
   const endsAt = endsAtRaw ? new Date(endsAtRaw).toISOString() : null;
   try {
-    await Api.adminCreateBundle({ name, tag, imageUrl, description, items: selectedChips, disc, visibility: currentVisibility, active: true, endsAt });
+    const items = selectedChips.map((s) => s.productId);
+    const itemSpecs = selectedChips.map((s) => ({
+      productId: s.productId,
+      variantIndex: s.variantIndex == null ? null : Number(s.variantIndex),
+    }));
+    await Api.adminCreateBundle({ name, tag, imageUrl, description, items, itemSpecs, disc, visibility: currentVisibility, active: true, endsAt });
     resetBundleForm();
     await reloadAdminLists();
     const v = currentVisibility === 'public' ? '🌐 公開' : '💼 經銷限定';

@@ -875,6 +875,13 @@ input:focus,select:focus,textarea:focus{border-color:var(--primary);box-shadow:0
   display:inline-block;padding:1px 6px;border-radius:10px;
   background:#5C7E8F;color:#fff;font-size:10px;font-weight:700;letter-spacing:.3px;
 }
+.sel-chip-vlabel{
+  display:inline-block;padding:1px 6px;border-radius:8px;
+  background:rgba(92,126,143,0.12);color:#5C7E8F;
+  font-size:11px;font-weight:600;letter-spacing:.2px;
+}
+.sel-chip.sel-chip-var{border-style:dashed}
+.sel-chip.sel-chip-var.selected{border-style:solid}
 .discount-row{display:flex;align-items:center;gap:14px}
 .discount-row input[type=range]{flex:1;accent-color:var(--primary)}
 .disc-label{font-size:13px;font-weight:700;color:var(--text-light)}
